@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="intent_action_setup_alarm">gr.uoa.di.monitoring.android.intent.action.SETUP_ALARM</string>
+    <string name="intent_action_cancel_alarm">gr.uoa.di.monitoring.android.intent.action.CANCEL_ALARM</string>
+    <string name="intent_action_monitor">gr.uoa.di.monitoring.android.intent.action.MONITOR</string>
+    <string name="enable_monitoring_master_pref_key">enable_monitoring</string>
+</resources>
