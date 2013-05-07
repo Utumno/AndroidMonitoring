@@ -64,7 +64,7 @@ public class SettingsActivity extends PreferenceActivity {
 		setupSimplePreferencesScreen();
 		// findPreference will return null if setupSimplePreferencesScreen
 		// hasn't run
-		Log.d(TAG, "master_enable : " + master_enable + "\tmaster_pref : "
+		Log.v(TAG, "master_enable : " + master_enable + "\tmaster_pref : "
 				+ master_pref);
 		master_pref.setOnPreferenceChangeListener(listener);
 	}
@@ -209,7 +209,7 @@ public class SettingsActivity extends PreferenceActivity {
 			if (newValue instanceof Boolean) {
 				boolean enable = (Boolean) newValue;
 				Monitor.enableMonitoring(getApplicationContext(), enable);
-				Log.d(TAG, "master enable : " + enable);
+				Log.v(TAG, "master enable : " + enable);
 				// TODO : display dialog and wait till preference
 				// enabled/disabled
 				return true;

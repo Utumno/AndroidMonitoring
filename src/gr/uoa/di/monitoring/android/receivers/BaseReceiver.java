@@ -6,6 +6,8 @@ import android.content.Context;
 import android.content.pm.PackageManager;
 import android.util.Log;
 
+import gr.uoa.di.monitoring.android.C;
+
 public abstract class BaseReceiver extends BroadcastReceiver {
 
 	protected final static String TAG = BaseReceiver.class.getSimpleName();
@@ -31,16 +33,22 @@ public abstract class BaseReceiver extends BroadcastReceiver {
 			Class<? extends BaseReceiver> receiver) {
 		PackageManager pacman = context.getPackageManager();
 		final ComponentName componentName = new ComponentName(context, receiver);
-		Log.d(TAG, componentName.toString());
+		if (C.VERBOSE) Log.v(TAG, componentName.toString());
 		final int state = (enable) ? PackageManager.COMPONENT_ENABLED_STATE_ENABLED
 				: PackageManager.COMPONENT_ENABLED_STATE_DISABLED;
 		pacman.setComponentEnabledSetting(componentName, state,
 				PackageManager.DONT_KILL_APP);
-		Log.d(TAG,
-				"pacman : " + pacman.getComponentEnabledSetting(componentName));
+		if (C.VERBOSE)
+			Log.v(TAG,
+					"pacman : "
+							+ pacman.getComponentEnabledSetting(componentName));
 	}
 
-	protected void w(String msg) {
+	void w(String msg) {
 		Log.w(tag_, msg);
+	}
+
+	void d(String msg) {
+		if (C.DEBUG) Log.d(tag_, msg);
 	}
 }

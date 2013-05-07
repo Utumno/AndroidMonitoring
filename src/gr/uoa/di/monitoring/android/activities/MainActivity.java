@@ -1,13 +1,17 @@
 package gr.uoa.di.monitoring.android.activities;
 
+import android.annotation.TargetApi;
 import android.content.Intent;
+import android.os.Build;
 import android.os.Bundle;
+import android.os.Environment;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.View.OnClickListener;
 
 import gr.uoa.di.monitoring.android.R;
 
+@TargetApi(Build.VERSION_CODES.HONEYCOMB)
 public class MainActivity extends BaseActivity implements OnClickListener {
 
 	private int detailsLayout = UNDEFINED;
@@ -24,7 +28,14 @@ public class MainActivity extends BaseActivity implements OnClickListener {
 		for (int button : BUTTONS) {
 			findViewById(button).setOnClickListener(this);
 		}
-		d("On create finished");
+		String msg = null;
+		if (android.os.Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB) {
+			msg = " - isExternalStorageRemovable() : "
+					+ Environment.isExternalStorageRemovable() + " Emulated :"
+					+ Environment.isExternalStorageEmulated();
+		}
+		d(getFilesDir().getAbsolutePath() + " path " + getFilesDir().getPath());
+		v("On create finished" + msg);
 	}
 
 	@Override

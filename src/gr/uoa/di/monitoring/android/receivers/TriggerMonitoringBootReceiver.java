@@ -12,14 +12,14 @@ import gr.uoa.di.monitoring.android.services.Monitor;
  *
  * @author MrD
  */
-public class TriggerMonitoringBootReceiver extends BaseReceiver {
+public final class TriggerMonitoringBootReceiver extends BaseReceiver {
 
 	@Override
 	public void onReceive(Context context, Intent intent) {
-		w(intent.toString());
+		d(intent.toString());
 		final String action = intent.getAction(); // NPE ?
 		if (Intent.ACTION_BOOT_COMPLETED.equals(action)) {
-			w("Enabling receivers");
+			d("Enabling receivers");
 			Monitor.enableMonitoring(context, true);
 		} else {
 			w("Received bogus intent :\n" + intent + "\nAction : " + action);

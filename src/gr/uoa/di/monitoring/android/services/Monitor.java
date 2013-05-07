@@ -2,54 +2,82 @@ package gr.uoa.di.monitoring.android.services;
 
 import android.content.Context;
 import android.content.Intent;
-import android.content.res.Resources;
 import android.net.Uri;
+import android.os.Environment;
+import android.telephony.TelephonyManager;
 import android.util.Log;
 
 import com.commonsware.cwac.wakeful.WakefulIntentService;
 
-import gr.uoa.di.monitoring.android.R;
+import gr.uoa.di.monitoring.android.AccessPreferences;
+import gr.uoa.di.monitoring.android.C;
+import gr.uoa.di.monitoring.android.FileIO;
 import gr.uoa.di.monitoring.android.receivers.BaseMonitoringReceiver;
 import gr.uoa.di.monitoring.android.receivers.BaseReceiver;
 import gr.uoa.di.monitoring.android.receivers.BatteryMonitoringReceiver;
 import gr.uoa.di.monitoring.android.receivers.TriggerMonitoringBootReceiver;
+import gr.uoa.di.monitoring.android.receivers.WifiMonitoringReceiver;
 
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 
 public abstract class Monitor extends WakefulIntentService {
 
-	private static CharSequence ac_setup_alarm;
-	private static CharSequence ac_cancel_alarm;
 	private final String tag_ = this.getClass().getSimpleName();
 	private static final String TAG = Monitor.class.getSimpleName();
+	/**
+	 * The name of the charset to use when writing to files - ASCII for space
+	 */
+	private static final String CHARSET_NAME = "ASCII";
+	private static final String NO_IMEI = "NO_IMEI";
+	private static String sImei;
+	private static final int INITIAL_DELAY = 5000; // 5 seconds
 	private static final List<Class<? extends BaseReceiver>> RECEIVERS = new ArrayList<Class<? extends BaseReceiver>>();
 	private static final List<Class<? extends BaseMonitoringReceiver>> SETUP_ALARM_RECEIVERS = new ArrayList<Class<? extends BaseMonitoringReceiver>>();
+	// subclasses fields - subclasses are final so those have default scope
+	static final String DELIMITER = "::";
 	static {
 		Log.d(TAG, "Static Init");
 		RECEIVERS.add(TriggerMonitoringBootReceiver.class);
-		RECEIVERS.add(BatteryMonitoringReceiver.class);
 		SETUP_ALARM_RECEIVERS.add(BatteryMonitoringReceiver.class);
+		SETUP_ALARM_RECEIVERS.add(WifiMonitoringReceiver.class);
+		RECEIVERS.addAll(SETUP_ALARM_RECEIVERS);
 	}
 
 	public Monitor(String name) {
 		super(name);
 	}
 
-	public static final int INITIAL_DELAY = 5000; // 5 seconds
+	@Override
+	public final void onCreate() {
+		super.onCreate();
+		try {
+			if (sImei == null) {
+				final Context applicationContext = this.getApplicationContext();
+				TelephonyManager tm = (TelephonyManager) applicationContext
+						.getSystemService(Context.TELEPHONY_SERVICE);
+				sImei = tm.getDeviceId();
+			}
+		} catch (NullPointerException e) {
+			w("No imei today : " + e);
+			sImei = NO_IMEI;
+		}
+	}
 
-	public static long getInterval() {
-		return 5 * 60 * 1000;
+	public abstract long getInterval();
+
+	public static int getInitialDelay() {
+		return INITIAL_DELAY;
 	}
 
 	public static void enableMonitoring(Context ctx, boolean enable) {
 		Log.d(TAG, "enableMonitoring : " + enable);
-		Resources resources = ctx.getResources();
-		ac_setup_alarm = resources.getText(R.string.intent_action_setup_alarm);
-		ac_cancel_alarm = resources
-				.getText(R.string.intent_action_cancel_alarm);
 		Log.d(TAG, "setup/cancel alarms : "
-				+ (enable ? ac_setup_alarm : ac_cancel_alarm));
+				+ (enable ? C.ac_setup_alarm : C.ac_cancel_alarm));
 		if (enable) {
 			_enableDisableReceivers(ctx, enable);
 			_setupCancelAlarms(ctx, enable);
@@ -62,8 +90,8 @@ public abstract class Monitor extends WakefulIntentService {
 	private static void _setupCancelAlarms(Context ctx, boolean enable) {
 		for (Class<? extends BaseMonitoringReceiver> sEClass : SETUP_ALARM_RECEIVERS) {
 			Intent i = new Intent(""
-					+ (enable ? ac_setup_alarm : ac_cancel_alarm), Uri.EMPTY,
-					ctx, sEClass);
+					+ (enable ? C.ac_setup_alarm : C.ac_cancel_alarm),
+					Uri.EMPTY, ctx, sEClass);
 			Log.d(TAG, "setup/cancel alarms int : " + i);
 			ctx.sendBroadcast(i);
 		}
@@ -75,8 +103,81 @@ public abstract class Monitor extends WakefulIntentService {
 			BaseReceiver.enable(ctx, enable, receiver);
 	}
 
-	protected void w(String msg) {
+	//
+	// methods used by the subclasses
+	//
+	void w(String msg) {
 		Log.w(tag_, msg);
+		try {
+			// create a File object for the parent directory
+			final boolean externalStoragePresent = FileIO
+					.isExternalStoragePresent();
+			Log.w(tag_, "External : " + externalStoragePresent);
+			if (externalStoragePresent) {
+				File logdir = new File(Environment
+						.getExternalStoragePublicDirectory(
+								Environment.DIRECTORY_DOWNLOADS)
+						.getAbsolutePath());
+				// have the object build the directory structure, if needed.
+				if ((logdir.mkdirs() || logdir.isDirectory())) {
+					// create a File object for the output file
+					File outputFile = new File(logdir, "LOG.log");
+					// now attach the OutputStream to the file object, instead
+					// of a
+					// String representation
+					FileIO.append(outputFile, msg + "\n", CHARSET_NAME);
+				} else {
+					w("can't create output directory");
+				}
+			} // else
+			FileIO.append("LOG.log", msg + "\n", this, CHARSET_NAME,
+					Context.MODE_WORLD_READABLE);
+		} catch (FileNotFoundException e) {
+			Log.w(tag_, e + "");
+		} catch (IOException e) {
+			Log.w(tag_, e + "");
+		}
+	}
+
+	void w(String msg, Throwable t) {
+		Log.w(tag_, msg, t);
+	}
+
+	void w(Throwable t) {
+		Log.w(tag_, t);
+	}
+
+	void d(String msg) {
+		if (C.DEBUG) Log.d(tag_, msg);
+	}
+
+	void i(String msg) {
+		if (C.INFO) Log.i(tag_, msg);
+	}
+
+	<T> void persist(String key, T value) {
+		AccessPreferences.persist(this, key, value);
+	}
+
+	<T> T retrieve(String key, T value) {
+		return AccessPreferences.retrieve(this, key, value);
+	}
+
+	/**
+	 * All monitoring info is required to provide a timestamp and the IMEI -
+	 * this method takes care of that
+	 *
+	 * @return a StringBuilder containing the common info
+	 */
+	StringBuilder monitorInfoHeader() {
+		StringBuilder sb = new StringBuilder();
+		sb.append(sImei);
+		sb.append(DELIMITER);
+		// TODO time...
+		// sb.append(System.currentTimeMillis() / 1000);
+		sb.append(new Date(System.currentTimeMillis()));
+		sb.append(DELIMITER);
+		return sb;
 	}
 }
 

@@ -1,11 +1,13 @@
 package gr.uoa.di.monitoring.android.activities;
 
+import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.util.Log;
 import android.view.Menu;
 
 import gr.uoa.di.monitoring.android.R;
 
+@SuppressLint("Registered")
 class BaseActivity extends Activity {
 
 	protected final static int UNDEFINED = -1;
@@ -22,7 +24,11 @@ class BaseActivity extends Activity {
 		return true;
 	}
 
-	protected void d(String msg) {
+	void d(String msg) {
 		Log.d(tag_, msg);
+	}
+
+	void v(String msg) {
+		Log.v(tag_, msg);
 	}
 }

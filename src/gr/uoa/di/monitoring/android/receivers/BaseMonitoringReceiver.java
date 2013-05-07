@@ -4,12 +4,11 @@ import android.app.AlarmManager;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
-import android.content.res.Resources;
 import android.os.SystemClock;
 
 import com.commonsware.cwac.wakeful.WakefulIntentService;
 
-import gr.uoa.di.monitoring.android.R;
+import gr.uoa.di.monitoring.android.C;
 import gr.uoa.di.monitoring.android.services.Monitor;
 
 /**
@@ -26,13 +25,12 @@ public abstract class BaseMonitoringReceiver extends BaseReceiver {
 
 	protected static final String RECEIVERS_PACKAGE_NAME = BaseMonitoringReceiver.class
 			.getPackage().toString().split(" ")[1];
+	/**
+	 * Defined by subclasses
+	 */
+	private final Class<? extends Monitor> monitor_class_ = getService();
 	// could be in method setupAlarm() ??? or not ?
 	private Intent monitoringIntent;
-	// any way to make those static ? final ?
-	private Resources resources;
-	private CharSequence ac_setup_alarm;
-	private CharSequence ac_cancel_alarm;
-	private CharSequence ac_monitor;
 	// could be in method setupAlarm()
 	private PendingIntent pi;
 	private AlarmManager am; // static ? final ?
@@ -45,42 +43,41 @@ public abstract class BaseMonitoringReceiver extends BaseReceiver {
 	final public void onReceive(Context context, Intent intent) {
 		// FIXME : possible NPE below ?
 		final String action = intent.getAction(); // can intent==null ?
-		w("" + action);
-		resources = context.getResources();
-		ac_setup_alarm = resources.getText(R.string.intent_action_setup_alarm);
-		ac_cancel_alarm = resources
-				.getText(R.string.intent_action_cancel_alarm);
-		ac_monitor = resources.getText(R.string.intent_action_monitor);
-		if (ac_setup_alarm.equals(action) || ac_cancel_alarm.equals(action)) {
+		d("" + action);
+		if (C.ac_setup_alarm.equals(action) || C.ac_cancel_alarm.equals(action)) {
 			monitoringIntent = new Intent(context, this.getClass());
-			// (ac_monitor + "") below WOULD END UP MAKING THE ACTION null (!?)
-			monitoringIntent.setAction(ac_monitor.toString());
+			// (C.ac_monitor + "") below WOULD END UP MAKING THE ACTION null (!?)
+			monitoringIntent.setAction(C.ac_monitor.toString());
 			monitoringIntent.setPackage(RECEIVERS_PACKAGE_NAME);// TODO: needed?
-			final boolean enable = ac_setup_alarm.equals(action);
+			final boolean enable = C.ac_setup_alarm.equals(action);
 			setupAlarm(context, enable);
-		} else if (ac_monitor.equals(action)) {
+		} else if (C.ac_monitor.equals(action)) {
 			// monitoring - got broadcast from ALARM
-			Class<? extends WakefulIntentService> serviceClass = getService();
-			WakefulIntentService.sendWakefulWork(context, serviceClass);
+			WakefulIntentService.sendWakefulWork(context, monitor_class_);
 		} else {
 			w("Received bogus intent : " + intent);
 			return;
 		}
 	}
 
-	// protected Class<? extends WakefulIntentService> getService() {
-	// throw new IllegalStateException("This should never be called directly");
-	// }
-	protected abstract Class<? extends WakefulIntentService> getService();
+	protected abstract Class<? extends Monitor> getService();
 
 	private void setupAlarm(Context context, boolean setup) {
 		am = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
 		pi = PendingIntent.getBroadcast(context, NOT_USED, monitoringIntent,
 				PendingIntent.FLAG_UPDATE_CURRENT);
 		if (setup) {
-			am.setInexactRepeating(AlarmManager.ELAPSED_REALTIME_WAKEUP,
-					SystemClock.elapsedRealtime() + Monitor.INITIAL_DELAY,
-					Monitor.getInterval(), pi);
+			try {
+				am.setInexactRepeating(AlarmManager.ELAPSED_REALTIME_WAKEUP,
+						SystemClock.elapsedRealtime() + Monitor.getInitialDelay(),
+						monitor_class_.newInstance().getInterval(), pi);
+			} catch (InstantiationException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			} catch (IllegalAccessException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
 		} else {
 			am.cancel(pi);
 		}
