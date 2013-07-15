@@ -2,9 +2,10 @@ package gr.uoa.di.monitoring.android.activities;
 
 import android.annotation.TargetApi;
 import android.content.Intent;
+import android.content.pm.PackageInfo;
+import android.content.pm.PackageManager.NameNotFoundException;
 import android.os.Build;
 import android.os.Bundle;
-import android.os.Environment;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.View.OnClickListener;
@@ -28,14 +29,26 @@ public class MainActivity extends BaseActivity implements OnClickListener {
 		for (int button : BUTTONS) {
 			findViewById(button).setOnClickListener(this);
 		}
-		String msg = null;
-		if (android.os.Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB) {
-			msg = " - isExternalStorageRemovable() : "
-					+ Environment.isExternalStorageRemovable() + " Emulated :"
-					+ Environment.isExternalStorageEmulated();
-		}
+		// String msg = null;
+		// if (android.os.Build.VERSION.SDK_INT >=
+		// Build.VERSION_CODES.HONEYCOMB) {
+		// msg = " - isExternalStorageRemovable() : "
+		// + Environment.isExternalStorageRemovable() + " Emulated :"
+		// + Environment.isExternalStorageEmulated();
+		// }
+		PackageInfo pInfo = packageInfo();
+		v("On create finished (" + pInfo.versionCode + ")");
+	}
+
+	private PackageInfo packageInfo() {
 		d(getFilesDir().getAbsolutePath() + " path " + getFilesDir().getPath());
-		v("On create finished" + msg);
+		PackageInfo pInfo = null;
+		try {
+			pInfo = getPackageManager().getPackageInfo(getPackageName(), 0);
+		} catch (NameNotFoundException e) {
+			e.printStackTrace();
+		}
+		return pInfo;
 	}
 
 	@Override

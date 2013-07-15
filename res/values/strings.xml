@@ -14,4 +14,7 @@
     <string name="str_pref_monitor_on">Monitoring is on</string>
     <string name="pref_enable_monitoring_summary">Enable or disable all monitoring activity</string>
     <string name="pref_enable_monitoring_title">Enable monitoring</string>
+    <string name="title_activity_dialog">DialogActivity</string>
+    <string name="str_b_yes">Yes</string>
+    <string name="str_b_no">No</string>
 </resources>

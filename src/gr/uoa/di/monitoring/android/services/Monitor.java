@@ -10,13 +10,12 @@ import android.util.Log;
 import com.commonsware.cwac.wakeful.WakefulIntentService;
 
 import gr.uoa.di.monitoring.android.AccessPreferences;
-import gr.uoa.di.monitoring.android.C;
 import gr.uoa.di.monitoring.android.FileIO;
+import gr.uoa.di.monitoring.android.R;
 import gr.uoa.di.monitoring.android.receivers.BaseMonitoringReceiver;
 import gr.uoa.di.monitoring.android.receivers.BaseReceiver;
-import gr.uoa.di.monitoring.android.receivers.BatteryMonitoringReceiver;
+import gr.uoa.di.monitoring.android.receivers.LocationMonitoringReceiver;
 import gr.uoa.di.monitoring.android.receivers.TriggerMonitoringBootReceiver;
-import gr.uoa.di.monitoring.android.receivers.WifiMonitoringReceiver;
 
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -24,6 +23,13 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+
+import static gr.uoa.di.monitoring.android.C.DEBUG;
+import static gr.uoa.di.monitoring.android.C.DISABLE;
+import static gr.uoa.di.monitoring.android.C.INFO;
+import static gr.uoa.di.monitoring.android.C.WARN;
+import static gr.uoa.di.monitoring.android.C.ac_cancel_alarm;
+import static gr.uoa.di.monitoring.android.C.ac_setup_alarm;
 
 public abstract class Monitor extends WakefulIntentService {
 
@@ -41,11 +47,11 @@ public abstract class Monitor extends WakefulIntentService {
 	// subclasses fields - subclasses are final so those have default scope
 	static final String DELIMITER = "::";
 	static {
-		Log.d(TAG, "Static Init");
-		RECEIVERS.add(TriggerMonitoringBootReceiver.class);
-		SETUP_ALARM_RECEIVERS.add(BatteryMonitoringReceiver.class);
-		SETUP_ALARM_RECEIVERS.add(WifiMonitoringReceiver.class);
+		// SETUP_ALARM_RECEIVERS.add(BatteryMonitoringReceiver.class);
+		// SETUP_ALARM_RECEIVERS.add(WifiMonitoringReceiver.class);
+		SETUP_ALARM_RECEIVERS.add(LocationMonitoringReceiver.class);
 		RECEIVERS.addAll(SETUP_ALARM_RECEIVERS);
+		RECEIVERS.add(TriggerMonitoringBootReceiver.class);
 	}
 
 	public Monitor(String name) {
@@ -53,7 +59,7 @@ public abstract class Monitor extends WakefulIntentService {
 	}
 
 	@Override
-	public final void onCreate() {
+	public void onCreate() {
 		super.onCreate();
 		try {
 			if (sImei == null) {
@@ -77,7 +83,7 @@ public abstract class Monitor extends WakefulIntentService {
 	public static void enableMonitoring(Context ctx, boolean enable) {
 		Log.d(TAG, "enableMonitoring : " + enable);
 		Log.d(TAG, "setup/cancel alarms : "
-				+ (enable ? C.ac_setup_alarm : C.ac_cancel_alarm));
+			+ (enable ? ac_setup_alarm : ac_cancel_alarm));
 		if (enable) {
 			_enableDisableReceivers(ctx, enable);
 			_setupCancelAlarms(ctx, enable);
@@ -90,8 +96,8 @@ public abstract class Monitor extends WakefulIntentService {
 	private static void _setupCancelAlarms(Context ctx, boolean enable) {
 		for (Class<? extends BaseMonitoringReceiver> sEClass : SETUP_ALARM_RECEIVERS) {
 			Intent i = new Intent(""
-					+ (enable ? C.ac_setup_alarm : C.ac_cancel_alarm),
-					Uri.EMPTY, ctx, sEClass);
+				+ (enable ? ac_setup_alarm : ac_cancel_alarm), Uri.EMPTY, ctx,
+					sEClass);
 			Log.d(TAG, "setup/cancel alarms int : " + i);
 			ctx.sendBroadcast(i);
 		}
@@ -103,64 +109,22 @@ public abstract class Monitor extends WakefulIntentService {
 			BaseReceiver.enable(ctx, enable, receiver);
 	}
 
-	//
+	// =========================================================================
 	// methods used by the subclasses
-	//
-	void w(String msg) {
-		Log.w(tag_, msg);
-		try {
-			// create a File object for the parent directory
-			final boolean externalStoragePresent = FileIO
-					.isExternalStoragePresent();
-			Log.w(tag_, "External : " + externalStoragePresent);
-			if (externalStoragePresent) {
-				File logdir = new File(Environment
-						.getExternalStoragePublicDirectory(
-								Environment.DIRECTORY_DOWNLOADS)
-						.getAbsolutePath());
-				// have the object build the directory structure, if needed.
-				if ((logdir.mkdirs() || logdir.isDirectory())) {
-					// create a File object for the output file
-					File outputFile = new File(logdir, "LOG.log");
-					// now attach the OutputStream to the file object, instead
-					// of a
-					// String representation
-					FileIO.append(outputFile, msg + "\n", CHARSET_NAME);
-				} else {
-					w("can't create output directory");
-				}
-			} // else
-			FileIO.append("LOG.log", msg + "\n", this, CHARSET_NAME,
-					Context.MODE_WORLD_READABLE);
-		} catch (FileNotFoundException e) {
-			Log.w(tag_, e + "");
-		} catch (IOException e) {
-			Log.w(tag_, e + "");
-		}
-	}
-
-	void w(String msg, Throwable t) {
-		Log.w(tag_, msg, t);
-	}
-
-	void w(Throwable t) {
-		Log.w(tag_, t);
-	}
-
-	void d(String msg) {
-		if (C.DEBUG) Log.d(tag_, msg);
-	}
-
-	void i(String msg) {
-		if (C.INFO) Log.i(tag_, msg);
-	}
-
+	// =========================================================================
 	<T> void persist(String key, T value) {
 		AccessPreferences.persist(this, key, value);
 	}
 
 	<T> T retrieve(String key, T value) {
 		return AccessPreferences.retrieve(this, key, value);
+	}
+
+	void abort() {
+		CharSequence master_enable = getResources().getText(
+			R.string.enable_monitoring_master_pref_key);
+		AccessPreferences.persist(this, master_enable.toString(), DISABLE);
+		enableMonitoring(this, DISABLE);
 	}
 
 	/**
@@ -171,13 +135,62 @@ public abstract class Monitor extends WakefulIntentService {
 	 */
 	StringBuilder monitorInfoHeader() {
 		StringBuilder sb = new StringBuilder();
-		sb.append(sImei);
-		sb.append(DELIMITER);
+		// sb.append(sImei);
+		// sb.append(DELIMITER);
 		// TODO time...
 		// sb.append(System.currentTimeMillis() / 1000);
 		sb.append(new Date(System.currentTimeMillis()));
 		sb.append(DELIMITER);
 		return sb;
+	}
+
+	// =========================================================================
+	// LOGGING
+	// =========================================================================
+	void w(String msg) {
+		if (!WARN) return;
+		Log.w(tag_, msg);
+		try {
+			// create a File object for the parent directory
+			final boolean externalStoragePresent = FileIO
+					.isExternalStoragePresent();
+			// d("External : " + externalStoragePresent);
+			if (externalStoragePresent) {
+				File logdir = new File(Environment
+						.getExternalStoragePublicDirectory(
+							Environment.DIRECTORY_DOWNLOADS).getAbsolutePath());
+				// have the object build the directory structure, if needed.
+				if (FileIO.createDirExternal(logdir)) {
+					// create a File object for the output file
+					File outputFile = new File(logdir, "LOG.log");
+					FileIO.append(outputFile, msg + "\n", CHARSET_NAME);
+				} else {
+					w("can't create output directory");
+				}
+			} // else
+				// FileIO.append("LOG.log", msg + "\n", this, CHARSET_NAME,
+				// Context.MODE_PRIVATE);
+		} catch (FileNotFoundException e) {
+			Log.w(tag_, e + "");
+		} catch (IOException e) {
+			Log.w(tag_, e + "");
+		}
+	}
+
+	void w(String msg, Throwable t) {
+		if (WARN) Log.w(tag_, msg, t);
+	}
+
+	void w(Throwable t) {
+		if (WARN) Log.w(tag_, t);
+	}
+
+	void d(String msg) {
+		if (DEBUG) Log.d(tag_, msg);
+	}
+
+	void i(String msg) {
+		if (INFO) Log.i(tag_, msg);
 	}
 }
 

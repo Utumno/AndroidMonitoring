@@ -8,6 +8,7 @@ import android.media.RingtoneManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.preference.CheckBoxPreference;
 import android.preference.ListPreference;
 import android.preference.Preference;
 import android.preference.Preference.OnPreferenceChangeListener;
@@ -49,11 +50,15 @@ public class SettingsActivity extends PreferenceActivity {
 	private OnPreferenceChangeListener listener;
 	private static Preference master_pref;
 
+	public static String masterPrefKey() {
+		return master_enable.toString();
+	}
+
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
 		master_enable = this.getResources().getText(
-				R.string.enable_monitoring_master_pref_key);
+			R.string.enable_monitoring_master_pref_key);
 		listener = new ToggleMonitoringListener();
 	}
 
@@ -64,9 +69,34 @@ public class SettingsActivity extends PreferenceActivity {
 		setupSimplePreferencesScreen();
 		// findPreference will return null if setupSimplePreferencesScreen
 		// hasn't run
-		Log.v(TAG, "master_enable : " + master_enable + "\tmaster_pref : "
-				+ master_pref);
+	}
+
+	@Override
+	protected void onResume() {
+		super.onResume();
+		// sBindPreferenceSummaryToValueListener.onPreferenceChange(
+		// master_pref,
+		// PreferenceManager.getDefaultSharedPreferences(
+		// master_pref.getContext())
+		// .getBoolean(master_pref.getKey(), true));
+		// boolean enable = AccessPreferences.retrieve(this,
+		// master_enable.toString(), null);
+		// Log.w(TAG, "onResume - enable : " + enable);
+		// boolean checked = ((CheckBoxPreference) master_pref).isChecked();
+		// Log.w(TAG, "onResume - master pref : " + checked);
+		// ((CheckBoxPreference) master_pref).setChecked(enable);
+		setPreferenceScreen(null);
+		setupSimplePreferencesScreen();
+		// onContentChanged(); // not needed
 		master_pref.setOnPreferenceChangeListener(listener);
+		// bindCheckBoxPreferenceSummaryToValue(master_pref); // LOL only 1 list
+	}
+
+	@Override
+	protected void onPause() {
+		super.onPause();
+		// master_pref.setOnPreferenceChangeListener(listener);
+		// FIXME unregister ????
 	}
 
 	/**
@@ -91,6 +121,9 @@ public class SettingsActivity extends PreferenceActivity {
 		getPreferenceScreen().addPreference(fakeHeader);
 		addPreferencesFromResource(R.xml.pref_data_sync);
 		master_pref = findPreference(master_enable.toString());
+		// FIXME : when changing the master enable pref the value is not updated
+		// if the PreferenceActivity is visible in the background
+		// bindPreferenceSummaryToValue(master_pref); // this throws ClassCast
 		// Bind the summaries of EditText/List/Dialog/Ringtone preferences to
 		// their values. When their values change, their summaries are updated
 		// to reflect the new value, per the Android Design guidelines.
@@ -121,8 +154,8 @@ public class SettingsActivity extends PreferenceActivity {
 	 */
 	private static boolean isSimplePreferences(Context context) {
 		return ALWAYS_SIMPLE_PREFS
-				|| Build.VERSION.SDK_INT < Build.VERSION_CODES.HONEYCOMB
-				|| !isXLargeTablet(context);
+			|| Build.VERSION.SDK_INT < Build.VERSION_CODES.HONEYCOMB
+			|| !isXLargeTablet(context);
 	}
 
 	/** {@inheritDoc} */
@@ -171,7 +204,7 @@ public class SettingsActivity extends PreferenceActivity {
 					// preference.setSummary(R.string.pref_ringtone_silent);
 				} else {
 					Ringtone ringtone = RingtoneManager.getRingtone(
-							preference.getContext(), Uri.parse(stringValue));
+						preference.getContext(), Uri.parse(stringValue));
 					if (ringtone == null) {
 						// Clear the summary if there was a lookup error.
 						preference.setSummary(null);
@@ -183,6 +216,13 @@ public class SettingsActivity extends PreferenceActivity {
 						preference.setSummary(name);
 					}
 				}
+			} else if (preference instanceof CheckBoxPreference) {
+				boolean b = (Boolean) value;
+				Log.w(TAG, "::::value " + b);
+				final CheckBoxPreference p = (CheckBoxPreference) preference;
+				preference.setSummary((b) ? p.getSummaryOn() : p
+						.getSummaryOff());
+				Log.w(TAG, p.getKey() + " :: " + p.isChecked());
 			} else {
 				// if (!MASTER_ENABLE.equals(value.toString())) {
 				// For all other preferences, set the summary to the value's
@@ -209,13 +249,39 @@ public class SettingsActivity extends PreferenceActivity {
 			if (newValue instanceof Boolean) {
 				boolean enable = (Boolean) newValue;
 				Monitor.enableMonitoring(getApplicationContext(), enable);
-				Log.v(TAG, "master enable : " + enable);
+				Log.v(TAG, "!master enable : " + enable);
+				boolean b = (Boolean) newValue;
+				final CheckBoxPreference p = (CheckBoxPreference) preference;
+				preference.setSummary((b) ? p.getSummaryOn() : p
+						.getSummaryOff());
 				// TODO : display dialog and wait till preference
 				// enabled/disabled
 				return true;
 			}
 			return false;
 		}
+	}
+
+	/**
+	 * Binds a BOOLEAN preference's summary to its value. More specifically,
+	 * when the preference's value is changed, its summary (line of text below
+	 * the preference title) is updated to reflect the value. The summary is
+	 * also immediately updated upon calling this method. The exact display
+	 * format is dependent on the type of preference.
+	 *
+	 * @see #sBindPreferenceSummaryToValueListener
+	 */
+	private static void bindCheckBoxPreferenceSummaryToValue(
+			Preference preference) {
+		// Set the listener to watch for value changes.
+		preference
+				.setOnPreferenceChangeListener(sBindPreferenceSummaryToValueListener);
+		// Trigger the listener immediately with the preference's
+		// current value.
+		sBindPreferenceSummaryToValueListener.onPreferenceChange(
+			preference,
+			PreferenceManager.getDefaultSharedPreferences(
+				preference.getContext()).getBoolean(preference.getKey(), true));
 	}
 
 	/**
@@ -234,10 +300,9 @@ public class SettingsActivity extends PreferenceActivity {
 		// Trigger the listener immediately with the preference's
 		// current value.
 		sBindPreferenceSummaryToValueListener.onPreferenceChange(
-				preference,
-				PreferenceManager.getDefaultSharedPreferences(
-						preference.getContext()).getString(preference.getKey(),
-						""));
+			preference,
+			PreferenceManager.getDefaultSharedPreferences(
+				preference.getContext()).getString(preference.getKey(), ""));
 	}
 
 	/**

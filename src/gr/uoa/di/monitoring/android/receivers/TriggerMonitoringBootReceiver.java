@@ -17,7 +17,7 @@ public final class TriggerMonitoringBootReceiver extends BaseReceiver {
 	@Override
 	public void onReceive(Context context, Intent intent) {
 		d(intent.toString());
-		final String action = intent.getAction(); // NPE ?
+		final String action = intent.getAction();
 		if (Intent.ACTION_BOOT_COMPLETED.equals(action)) {
 			d("Enabling receivers");
 			Monitor.enableMonitoring(context, true);

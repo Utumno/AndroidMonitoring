@@ -31,22 +31,26 @@ public final class R {
         public static final int ic_launcher=0x7f020000;
     }
     public static final class id {
-        public static final int about_button=0x7f0b0003;
-        public static final int action_settings=0x7f0b0008;
-        public static final int batteryTextHealth=0x7f0b0006;
-        public static final int battery_button=0x7f0b0000;
-        public static final int gps_button=0x7f0b0001;
-        public static final int menu_settings=0x7f0b0007;
-        public static final int monitor_details=0x7f0b0004;
-        public static final int monitor_preferences=0x7f0b0005;
-        public static final int wifi_button=0x7f0b0002;
+        public static final int about_button=0x7f0b0006;
+        public static final int action_settings=0x7f0b000b;
+        public static final int batteryTextHealth=0x7f0b0009;
+        public static final int battery_button=0x7f0b0003;
+        public static final int dialog_activity_no_button=0x7f0b0002;
+        public static final int dialog_activity_yes_button=0x7f0b0001;
+        public static final int dialog_text=0x7f0b0000;
+        public static final int gps_button=0x7f0b0004;
+        public static final int menu_settings=0x7f0b000a;
+        public static final int monitor_details=0x7f0b0007;
+        public static final int monitor_preferences=0x7f0b0008;
+        public static final int wifi_button=0x7f0b0005;
     }
     public static final class layout {
-        public static final int activity_main=0x7f030000;
-        public static final int activity_monitor=0x7f030001;
-        public static final int battery_details=0x7f030002;
-        public static final int battery_prefs=0x7f030003;
-        public static final int titlebar=0x7f030004;
+        public static final int activity_dialog=0x7f030000;
+        public static final int activity_main=0x7f030001;
+        public static final int activity_monitor=0x7f030002;
+        public static final int battery_details=0x7f030003;
+        public static final int battery_prefs=0x7f030004;
+        public static final int titlebar=0x7f030005;
     }
     public static final class menu {
         public static final int activity_main=0x7f0a0000;
@@ -63,18 +67,21 @@ public final class R {
         /**  Strings related to Settings 
  Example settings for Data & Sync 
          */
-        public static final int pref_header_data_sync=0x7f060010;
-        public static final int pref_title_sync_frequency=0x7f060011;
-        public static final int pref_title_system_sync_settings=0x7f060012;
+        public static final int pref_header_data_sync=0x7f060013;
+        public static final int pref_title_sync_frequency=0x7f060014;
+        public static final int pref_title_system_sync_settings=0x7f060015;
         public static final int str_b_about=0x7f060005;
         public static final int str_b_battery=0x7f060006;
         public static final int str_b_gps=0x7f060007;
+        public static final int str_b_no=0x7f060011;
         public static final int str_b_wifi=0x7f060008;
+        public static final int str_b_yes=0x7f060010;
         public static final int str_pref_monitor_off=0x7f06000b;
         public static final int str_pref_monitor_on=0x7f06000c;
+        public static final int title_activity_dialog=0x7f06000f;
         public static final int title_activity_main=0x7f060002;
         public static final int title_activity_monitor=0x7f060009;
-        public static final int title_activity_settings=0x7f06000f;
+        public static final int title_activity_settings=0x7f060012;
     }
     public static final class style {
         /** 

@@ -8,12 +8,13 @@ import android.content.SharedPreferences.Editor;
 import android.os.Build;
 import android.preference.PreferenceManager;
 
-import java.util.HashSet;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Set;
 
 public final class AccessPreferences {
 
-	private static final Set<Class<?>> CLASSES = new HashSet<Class<?>>();
+	private static final List<Class<?>> CLASSES = new ArrayList<Class<?>>();
 	static {
 		CLASSES.add(Boolean.class);
 		CLASSES.add(Float.class);
@@ -48,6 +49,7 @@ public final class AccessPreferences {
 		} else if (value instanceof Boolean) ed
 				.putBoolean(key, (Boolean) value);
 		else if (value instanceof Float) ed.putFloat(key, (Float) value);
+		// TODO : CORRECT ORDER OF INTEGER AND LONG
 		else if (value instanceof Integer) ed.putInt(key, (Integer) value);
 		else if (value instanceof Long) ed.putLong(key, (Long) value);
 		else if (value instanceof String) ed.putString(key, (String) value);
@@ -55,7 +57,7 @@ public final class AccessPreferences {
 			if (android.os.Build.VERSION.SDK_INT < Build.VERSION_CODES.HONEYCOMB) {
 				throw new IllegalStateException(
 						"You can add sets in the preferences only after API "
-								+ Build.VERSION_CODES.HONEYCOMB);
+							+ Build.VERSION_CODES.HONEYCOMB);
 			}
 			// The given set does not contain strings only --> not my problem
 			// Set<?> set = (Set<?>) value;
@@ -70,7 +72,7 @@ public final class AccessPreferences {
 			Editor soIcanAddSuppress = ed
 					.putStringSet(key, (Set<String>) value);
 		} else throw new IllegalArgumentException("The given value : " + value
-				+ " cannot be persisted");
+			+ " cannot be persisted");
 		ed.commit();
 	}
 
@@ -83,33 +85,51 @@ public final class AccessPreferences {
 			// which is both the default value provided and what Android would
 			// do (as in return the default value) (TODO: test)
 			if (!getPrefs(ctx).contains(key)) return null;
-			// if the key does exist I get the value and
+			// if the key does exist I get the value and..
 			final Object value = getPrefs(ctx).getAll().get(key);
-			// if null I return null
+			// ..if null I return null
 			if (value == null) return null;
-			// if not null I get the value of the class. Problem is that as far
-			// as the type system is concerned T is of the type the variable
+			// ..if not null I get the value of the class. Problem is that as
+			// far as the type system is concerned T is of the type the variable
 			// that is to receive the default value is. So :
 			// String s = AccessPreferences.retrieve(this, "key", null);
-			// if `"key" --> true` or `"key" --> 1.2` a ClassCastException will
-			// occur - FIXME
+			// if the value stored in is not a String for instance `"key" -->
+			// true` or `"key" --> 1.2` a ClassCastException will
+			// occur _in the assignment_ after retrieve returns
 			final Class<?> clazz = value.getClass();
+			// TODO : CORRECT ORDER OF INTEGER AND LONG
 			for (Class<?> cls : CLASSES) {
 				if (clazz.isAssignableFrom(cls)) {
-					// I can't directly cast to T as value may be boolean for
-					// instance
-					return (T) clazz.cast(value);
+					try {
+						// I can't directly cast to T as value may be boolean
+						// for instance
+						return (T) clazz.cast(value);
+					} catch (ClassCastException e) { // won't work see :
+						// http://stackoverflow.com/questions/186917/how-do-i-catch-classcastexception
+						// basically the (T) clazz.cast(value); line is
+						// translated to (Object) clazz.cast(value); which won't
+						// fail ever - the CCE is thrown in the assignment (T t
+						// =) String s = AccessPreferences.retrieve(this, "key",
+						// null); which is compiled as
+						// (String)AccessPreferences.retrieve(this, "key",
+						// null); and retrieve returns an Integer for instance
+						String msg = "Value : " + value + " stored for key : "
+							+ key
+							+ " is not assignable to variable of given type.";
+						throw new IllegalStateException(msg, e);
+					}
 				}
 			}
 			// that's really Illegal State I guess
 			throw new IllegalStateException("Unknown class for value :\n\t"
-					+ value + "\nstored in preferences");
+				+ value + "\nstored in preferences");
 		} else if (defaultValue instanceof Boolean) return (T) (Boolean) getPrefs(
-				ctx).getBoolean(key, (Boolean) defaultValue);
+			ctx).getBoolean(key, (Boolean) defaultValue);
 		else if (defaultValue instanceof Float) return (T) (Float) getPrefs(ctx)
 				.getFloat(key, (Float) defaultValue);
+		// TODO : CORRECT ORDER OF INTEGER AND LONG
 		else if (defaultValue instanceof Integer) return (T) (Integer) getPrefs(
-				ctx).getInt(key, (Integer) defaultValue);
+			ctx).getInt(key, (Integer) defaultValue);
 		else if (defaultValue instanceof Long) return (T) (Long) getPrefs(ctx)
 				.getLong(key, (Long) defaultValue);
 		else if (defaultValue instanceof String) return (T) getPrefs(ctx)
@@ -118,7 +138,7 @@ public final class AccessPreferences {
 			if (android.os.Build.VERSION.SDK_INT < Build.VERSION_CODES.HONEYCOMB) {
 				throw new IllegalStateException(
 						"You can add sets in the preferences only after API "
-								+ Build.VERSION_CODES.HONEYCOMB);
+							+ Build.VERSION_CODES.HONEYCOMB);
 			}
 			// The given set does not contain strings only --> not my problem
 			// Set<?> set = (Set<?>) defaultValue;
@@ -130,8 +150,8 @@ public final class AccessPreferences {
 			// }
 			// }
 			return (T) getPrefs(ctx).getStringSet(key,
-					(Set<String>) defaultValue);
+				(Set<String>) defaultValue);
 		} else throw new IllegalArgumentException(defaultValue
-				+ " cannot be persisted in SharedPreferences");
+			+ " cannot be persisted in SharedPreferences");
 	}
 }

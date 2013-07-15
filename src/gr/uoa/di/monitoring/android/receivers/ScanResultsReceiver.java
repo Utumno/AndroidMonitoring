@@ -7,8 +7,12 @@ import android.net.wifi.WifiManager;
 
 import com.commonsware.cwac.wakeful.WakefulIntentService;
 
-import gr.uoa.di.monitoring.android.C;
 import gr.uoa.di.monitoring.android.services.WifiMonitor;
+
+import static gr.uoa.di.monitoring.android.C.DISABLE;
+import static gr.uoa.di.monitoring.android.C.ac_scan_results_available;
+import static gr.uoa.di.monitoring.android.C.ac_scan_wifi_disabled;
+import static gr.uoa.di.monitoring.android.C.ac_scan_wifi_enabled;
 
 /**
  * BroadcastReceiver registered to receive wifi scan events. If this is enabled
@@ -31,12 +35,12 @@ public final class ScanResultsReceiver extends BaseReceiver {
 			d("Well I should have been disabled !");
 			return;
 		}
-		final String action = intent.getAction(); // NPE ?
+		final String action = intent.getAction();
 		d("Intent flags : " + intent.getFlags());
 		// 268435456 ie FLAG_RECEIVER_FOREGROUND for WIFI_STATE_CHANGED_ACTION
 		if (WifiManager.WIFI_STATE_CHANGED_ACTION.equals(action)) {
 			final int state = intent.getIntExtra(WifiManager.EXTRA_WIFI_STATE,
-					WifiManager.WIFI_STATE_UNKNOWN);
+				WifiManager.WIFI_STATE_UNKNOWN);
 			switch (state) {
 			case WifiManager.WIFI_STATE_ENABLING:
 				d("Enabling");
@@ -44,12 +48,12 @@ public final class ScanResultsReceiver extends BaseReceiver {
 					d("Wifi monitor did initiate enabling wifi - subsequent calls will be from user");
 					WifiMonitor.setInitiatedWifiEnabling(context, false);
 				} else {
-					d("Aparently the user did initiate enabling wifi (?????) - don't disable it !");
+					d("Apparently the user did initiate enabling wifi (?????) - don't disable it !");
 					WifiMonitor.keepNoteToDisableWireless(context, false);
 				}
 				break;
 			case WifiManager.WIFI_STATE_ENABLED:
-				Intent i2 = new Intent(C.ac_scan_wifi_enabled.toString(),
+				Intent i2 = new Intent(ac_scan_wifi_enabled.toString(),
 						Uri.EMPTY, context, WifiMonitor.class);
 				WakefulIntentService.sendWakefulWork(context, i2);
 				break;
@@ -60,8 +64,8 @@ public final class ScanResultsReceiver extends BaseReceiver {
 				disabled = true;
 				// TODO : will I have time to disable myself before some other
 				// intent is received (like disabling network or whatever ?)
-				BaseReceiver.enable(context, C.DISABLE, this.getClass());
-				Intent i = new Intent(C.ac_scan_wifi_disabled.toString(),
+				BaseReceiver.enable(context, DISABLE, this.getClass());
+				Intent i = new Intent(ac_scan_wifi_disabled.toString(),
 						Uri.EMPTY, context, WifiMonitor.class);
 				WakefulIntentService.sendWakefulWork(context, i);
 				break;
@@ -73,10 +77,10 @@ public final class ScanResultsReceiver extends BaseReceiver {
 			// TODO : will I have time to disable myself before some other
 			// intent is received (like disabling network or whatever ?)
 			disabled = true;
-			BaseReceiver.enable(context, C.DISABLE, this.getClass());
+			BaseReceiver.enable(context, DISABLE, this.getClass());
 			d("Directly invoke wifi monitor");
 			// TODO : uh oh, modularity
-			Intent i = new Intent(C.ac_scan_results_available.toString(),
+			Intent i = new Intent(ac_scan_results_available.toString(),
 					Uri.EMPTY, context, WifiMonitor.class);
 			WakefulIntentService.sendWakefulWork(context, i);
 		} else {

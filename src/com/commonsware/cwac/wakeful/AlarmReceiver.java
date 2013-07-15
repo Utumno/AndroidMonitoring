@@ -37,10 +37,10 @@ public class AlarmReceiver extends BroadcastReceiver {
 		if (listener != null) {
 			if (intent.getAction() == null) {
 				SharedPreferences prefs = ctxt.getSharedPreferences(
-						WakefulIntentService.NAME, 0);
+					WakefulIntentService.NAME, 0);
 				prefs.edit()
 						.putLong(WakefulIntentService.LAST_ALARM,
-								System.currentTimeMillis()).commit();
+							System.currentTimeMillis()).commit();
 				listener.sendWakefulWork(ctxt);
 			} else {
 				WakefulIntentService.scheduleAlarms(listener, ctxt, true);
@@ -54,7 +54,7 @@ public class AlarmReceiver extends BroadcastReceiver {
 		ComponentName cn = new ComponentName(ctxt, getClass());
 		try {
 			ActivityInfo ai = pm.getReceiverInfo(cn,
-					PackageManager.GET_META_DATA);
+				PackageManager.GET_META_DATA);
 			XmlResourceParser xpp = ai.loadXmlMetaData(pm, WAKEFUL_META_DATA);
 			while (xpp.getEventType() != XmlPullParser.END_DOCUMENT) {
 				if (xpp.getEventType() == XmlPullParser.START_TAG) {

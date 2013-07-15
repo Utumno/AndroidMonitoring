@@ -1,14 +1,15 @@
 package gr.uoa.di.monitoring.android.activities;
 
-import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.util.Log;
 import android.view.Menu;
 
 import gr.uoa.di.monitoring.android.R;
 
-@SuppressLint("Registered")
-class BaseActivity extends Activity {
+import static gr.uoa.di.monitoring.android.C.DEBUG;
+import static gr.uoa.di.monitoring.android.C.VERBOSE;
+
+abstract class BaseActivity extends Activity {
 
 	protected final static int UNDEFINED = -1;
 	/**
@@ -24,11 +25,14 @@ class BaseActivity extends Activity {
 		return true;
 	}
 
+	// =========================================================================
+	// LOGGING
+	// =========================================================================
 	void d(String msg) {
-		Log.d(tag_, msg);
+		if (DEBUG) Log.d(tag_, msg);
 	}
 
 	void v(String msg) {
-		Log.v(tag_, msg);
+		if (VERBOSE) Log.v(tag_, msg);
 	}
 }

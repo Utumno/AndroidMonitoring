@@ -32,6 +32,7 @@ public class FileIO {
 
 	private static final String TAG = FileIO.class.getSimpleName();
 	private static final boolean WARN = false;
+	private static final int BUFFERED_WRITER_SIZE = 8192;
 
 	/***************************/
 	/* execute around methods */
@@ -108,8 +109,8 @@ public class FileIO {
 	private static void assertValidMode(final int mode) {
 		@SuppressWarnings("deprecation")
 		final int allModes = Context.MODE_WORLD_READABLE
-				| Context.MODE_WORLD_WRITEABLE | Context.MODE_APPEND
-				| Context.MODE_PRIVATE;
+			| Context.MODE_WORLD_WRITEABLE | Context.MODE_APPEND
+			| Context.MODE_PRIVATE;
 		// w(Integer.toBinaryString(allModes));
 		int modeOr = mode | allModes;
 		// w(Integer.toBinaryString(modeOr));
@@ -150,7 +151,8 @@ public class FileIO {
 			public void useStream(OutputStream stream) throws IOException {
 				OutputStreamWriter wrt = new OutputStreamWriter(stream,
 						charsetName);
-				BufferedWriter buffer = new BufferedWriter(wrt);
+				BufferedWriter buffer = new BufferedWriter(wrt,
+						BUFFERED_WRITER_SIZE);
 				buffer.write(data);
 				buffer.flush();
 			}
@@ -193,7 +195,8 @@ public class FileIO {
 			public void useStream(OutputStream stream) throws IOException {
 				OutputStreamWriter wrt = new OutputStreamWriter(stream,
 						charsetName);
-				BufferedWriter buffer = new BufferedWriter(wrt);
+				BufferedWriter buffer = new BufferedWriter(wrt,
+						BUFFERED_WRITER_SIZE);
 				buffer.write(data);
 				buffer.flush();
 			}
@@ -225,6 +228,19 @@ public class FileIO {
 			mExternalStorageAvailable = mExternalStorageWriteable = false;
 		}
 		return (mExternalStorageAvailable) && (mExternalStorageWriteable);
+	}
+
+	/**
+	 * Given a File which corresponds to a _directory_ path creates this path if
+	 * it does not exists. The directory path must lie in EXTERNAL storage
+	 *
+	 * @param logdir
+	 *            the File instance whose path must be created
+	 * @return true if the path was created successfully or the path already
+	 *         existed and is a directory, false otherwise
+	 */
+	public static boolean createDirExternal(File logdir) {
+		return logdir.mkdirs() || logdir.isDirectory();
 	}
 
 	// =========================================================================

@@ -54,9 +54,9 @@ abstract public class WakefulIntentService extends IntentService {
 		SharedPreferences prefs = ctxt.getSharedPreferences(NAME, 0);
 		long lastAlarm = prefs.getLong(LAST_ALARM, 0);
 		if (lastAlarm == 0
-				|| force
-				|| (System.currentTimeMillis() > lastAlarm && System
-						.currentTimeMillis() - lastAlarm > listener.getMaxAge())) {
+			|| force
+			|| (System.currentTimeMillis() > lastAlarm && System
+					.currentTimeMillis() - lastAlarm > listener.getMaxAge())) {
 			AlarmManager mgr = (AlarmManager) ctxt
 					.getSystemService(Context.ALARM_SERVICE);
 			Intent i = new Intent(ctxt, AlarmReceiver.class);

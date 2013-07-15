@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="gr.uoa.di.monitoring.android"
-    android:versionCode="1"
+    android:versionCode="201307110439"
     android:versionName="1.0" >
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
@@ -10,6 +10,7 @@
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-sdk
         android:minSdkVersion="8"
         android:targetSdkVersion="17" />
@@ -37,8 +38,7 @@
         <!-- android:exported="false" system does not seem to care but to be on the safe side -->
         <receiver
             android:name=".receivers.TriggerMonitoringBootReceiver"
-            android:enabled="false"
-             >
+            android:enabled="false" >
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
                 <!-- http://stackoverflow.com/questions/11692923/any-way-to-know-if-device-booted-from-a-fastboot -->
@@ -55,6 +55,14 @@
             android:enabled="false" >
         </receiver>
         <receiver
+            android:name=".receivers.LocationMonitoringReceiver"
+            android:enabled="false" >
+        </receiver>
+        <receiver
+            android:name=".receivers.LocationReceiver"
+            android:enabled="false" >
+        </receiver>
+        <receiver
             android:name=".receivers.ScanResultsReceiver"
             android:enabled="false" >
             <intent-filter>
@@ -64,6 +72,12 @@
         </receiver>
         <service android:name=".services.BatteryMonitor" />
         <service android:name=".services.WifiMonitor" />
+        <service android:name=".services.LocationMonitor" />
         <service android:name=".services.WifiMonitor$Gatekeeper" />
+        <activity
+            android:name="gr.uoa.di.monitoring.android.activities.DialogActivity"
+            android:label="@string/title_activity_dialog"
+            android:theme="@android:style/Theme.Dialog" >
+        </activity>
     </application>
 </manifest>
