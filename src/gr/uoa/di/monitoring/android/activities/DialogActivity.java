@@ -1,5 +1,6 @@
 package gr.uoa.di.monitoring.android.activities;
 
+import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
 import android.view.Menu;
@@ -8,6 +9,8 @@ import android.view.View.OnClickListener;
 import android.widget.TextView;
 
 import gr.uoa.di.monitoring.android.R;
+
+import static gr.uoa.di.monitoring.android.C.launchActivity;
 
 public class DialogActivity extends BaseActivity implements OnClickListener {
 
@@ -19,6 +22,7 @@ public class DialogActivity extends BaseActivity implements OnClickListener {
 	private String mTitle;
 	private String mText;
 	private Intent mIntent;
+	private final static String TAG = DialogActivity.class.getName();
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
@@ -29,13 +33,12 @@ public class DialogActivity extends BaseActivity implements OnClickListener {
 		}
 		Intent in = this.getIntent();
 		if (in == null) {
-			throw new NullPointerException(getClass().getName()
+			throw new NullPointerException(TAG
 				+ " must be launched with non null intent");
 		}
 		final Bundle b = in.getExtras();
 		if (b == null) {
-			throw new NullPointerException("Null Bundle in "
-				+ getClass().getName());
+			throw new NullPointerException("Null Bundle in " + TAG);
 		}
 		mTitle = b.getString(DIALOG_TITLE_KEY);
 		mText = b.getString(DIALOG_TEXT_KEY);
@@ -74,10 +77,23 @@ public class DialogActivity extends BaseActivity implements OnClickListener {
 		switch (v.getId()) {
 		case R.id.dialog_activity_yes_button:
 			DialogActivity.this.startActivity(mIntent);
+			finish(); // TODO : launch another activity (my Settings activity)
 			break;
 		case R.id.dialog_activity_no_button:
 			finish();
 			break;
 		}
+	}
+
+	public static void launchDialogActivity(Context ctx, final String title,
+			final String text, final Intent intentToLaunchOnYes) {
+		Bundle extras = new Bundle();
+		extras = setDialogText(extras, text);
+		extras = setDialogTitle(extras, title);
+		extras = setDialogIntent(extras, intentToLaunchOnYes);
+		final Class<DialogActivity> cls = DialogActivity.class;
+		final Intent i = launchActivity(ctx, cls);
+		i.putExtras(extras);
+		ctx.startActivity(i);
 	}
 }

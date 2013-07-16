@@ -1,12 +1,12 @@
 package gr.uoa.di.monitoring.android.services;
 
 import android.app.PendingIntent;
-import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.location.Criteria;
 import android.location.Location;
 import android.location.LocationManager;
+import android.net.ConnectivityManager;
 import android.os.Bundle;
 import android.provider.Settings;
 
@@ -21,15 +21,18 @@ import static gr.uoa.di.monitoring.android.C.ENABLE;
 import static gr.uoa.di.monitoring.android.C.NOT_USED;
 import static gr.uoa.di.monitoring.android.C.ac_aborting;
 import static gr.uoa.di.monitoring.android.C.ac_location_data;
+import static gr.uoa.di.monitoring.android.C.launchSettings;
 
+;
 public final class LocationMonitor extends Monitor {
 
 	private static final long LOCATION_MONITORING_INTERVAL = 2 * 60 * 1000;
-	// GPS
+	// Location api calls constants
 	private static final int MIN_TIME_BETWEEN_SCANS = 1 * 30 * 1000;
 	private static final int MIN_DISTANCE = 0;
 	// convenience fields
 	private static LocationManager lm; // not final cause we need a f*ng context
+	private Providers.Status providerStatus;
 
 	public LocationMonitor() {
 		super(LocationMonitor.class.getSimpleName());
@@ -43,34 +46,11 @@ public final class LocationMonitor extends Monitor {
 			// monitor command from the alarm manager
 			final String provider = Providers.getProvider(this);
 			sb.append(" (" + provider + ") ");
-			if (provider == null) {
+			providerStatus = Providers.getProviderStatus(this, provider);
+			if (providerStatus.notAvailabe()) {
 				// FIXME : alert user & abort
 				// http://stackoverflow.com/questions/6031004/check-if-user-has-enabled-gps-after-prompted
-				final ComponentName toLaunch = new ComponentName(
-						"gr.uoa.di.monitoring.android",
-						"gr.uoa.di.monitoring.android.activities.DialogActivity");
-				final Intent i = new Intent();
-				i.addCategory(Intent.CATEGORY_LAUNCHER);
-				i.setComponent(toLaunch);
-				i.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-				Bundle extras = new Bundle();
-				extras = DialogActivity.setDialogText(extras,
-					"Your location services are disabled. "
-						+ "Monitoring will stop. Would you like to enable "
-						+ "them and restart monitoring ? ");
-				extras = DialogActivity.setDialogTitle(extras,
-					"Please enable location tracking");
-				final ComponentName gps = new ComponentName(
-						"com.android.settings",
-						"com.android.settings.SecuritySettings");
-				final Intent locationIntent = new Intent(
-						Settings.ACTION_LOCATION_SOURCE_SETTINGS);
-				locationIntent.addCategory(Intent.CATEGORY_LAUNCHER);
-				locationIntent.setComponent(gps);
-				locationIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-				extras = DialogActivity.setDialogIntent(extras, locationIntent);
-				i.putExtras(extras);
-				LocationMonitor.this.startActivity(i);
+				Providers.launchDialog(this, providerStatus);
 				w("Aborting : " + sb.toString());
 				abort();
 				return;
@@ -89,6 +69,8 @@ public final class LocationMonitor extends Monitor {
 				final Location loc = (Location) extras
 						.get(LocationManager.KEY_LOCATION_CHANGED);
 				if (loc == null) {
+					// FIXME disable the updates
+					// FIXME check what happens if I register once
 					w(sb + "NULL LOCATION  - EXTRAS : " + extras);
 					// if gps is disabled I keep getting this :
 					// NULL LOCATION - EXTRAS : Bundle[{providerEnabled=false}]
@@ -117,8 +99,17 @@ public final class LocationMonitor extends Monitor {
 		return lm;
 	}
 
+	/**
+	 * Provides the providers - wrapper around the LocationManager provider
+	 * facilities. Includes our Criteria and defines our policies
+	 *
+	 * @author MrD
+	 */
 	private final static class Providers {
 
+		private Providers() {}
+
+		// private static Context daFrigginCtx;
 		private final static Criteria CRITERIA;
 		static {
 			CRITERIA = new Criteria();
@@ -139,9 +130,99 @@ public final class LocationMonitor extends Monitor {
 			return m.lm().getBestProvider(CRITERIA, ENABLE);
 		}
 
+		private static Status getProviderStatus(Context ctx, String s) {
+			if (s.equals(null)) return Status.NULL;
+			if (s.equals(LocationManager.GPS_PROVIDER)) return Status.GPS;
+			if (s.equals(LocationManager.NETWORK_PROVIDER)) {
+				ConnectivityManager cm = (ConnectivityManager) ctx
+						.getSystemService(CONNECTIVITY_SERVICE);
+				Boolean isWifi = cm.getNetworkInfo(
+					ConnectivityManager.TYPE_WIFI).isConnectedOrConnecting();
+				if (isWifi) {
+					return Status.NETWORK;
+				}
+				return Status.NETWORK_NOT_CONNECTED;
+			}
+			return Status.UNKNOWN_PROVIDER;
+		}
+
+		private static void launchDialog(Context ctx, Status stat) {
+			DialogActivity.launchDialogActivity(ctx, stat.title(),
+				stat.notification(), stat.launchIntent());
+		}
+
 		@SuppressWarnings("unused")
 		private static String allProviders(LocationMonitor m) {
 			return Arrays.toString(m.lm().getAllProviders().toArray());
+		}
+
+		private enum Status {
+			GPS, NETWORK, NETWORK_NOT_CONNECTED, NULL, UNKNOWN_PROVIDER;
+
+			// TODO : add a constant on gps status GPS_NO_FIX
+			// FIXME : move messages to resources
+			//
+			private String title() {
+				switch (this) {
+				case NULL:
+					return "Enable location tracking";
+				case NETWORK_NOT_CONNECTED:
+					return "Connect to a network";
+				case GPS:
+					return "GPS location";
+				case NETWORK:
+					return "Network location";
+				case UNKNOWN_PROVIDER:
+					return "Unknown location provider";
+				}
+				throw new IllegalStateException("Forgotten enum constant");
+			}
+
+			private String notification() {
+				switch (this) {
+				case NULL:
+					return "Your location services are disabled. "
+						+ "Monitoring will stop. Would you like to enable "
+						+ "them and restart monitoring ?\n";
+				case NETWORK_NOT_CONNECTED:
+					return "You are not connected to a wireless network. "
+						+ "Monitoring will stop. Would you like to connect  "
+						+ "a network and restart monitoring ?\n";
+				case GPS:
+					return "Location is provided by GPS. That is the best "
+						+ "option for monitoring the location if outdoors. "
+						+ "Please if indoors connect to a wireless network\n";
+				case NETWORK:
+					return "Location is provided by your connection to a "
+						+ "wireless network. That is the best option for "
+						+ "monitoring the location if outdoors. Please consider"
+						+ " connecting to the GPS provider while outdoors\n";
+				case UNKNOWN_PROVIDER:
+					return "Your location services are new to us. "
+						+ "Monitoring will stop. Please enable GPS or if "
+						+ "indoors connect to a wireless network\n";
+				}
+				throw new IllegalStateException("Forgotten enum constant");
+			}
+
+			private Intent launchIntent() {
+				switch (this) {
+				case NULL:
+				case UNKNOWN_PROVIDER:
+					return launchSettings(Settings.ACTION_LOCATION_SOURCE_SETTINGS);
+				case NETWORK_NOT_CONNECTED:
+					return launchSettings(Settings.ACTION_WIFI_SETTINGS);
+				case GPS:
+				case NETWORK:
+					return null;
+				}
+				throw new IllegalStateException("Forgotten enum constant");
+			}
+
+			private boolean notAvailabe() {
+				if (this == GPS || this == NETWORK) return false;
+				return true;
+			}
 		}
 	}
 

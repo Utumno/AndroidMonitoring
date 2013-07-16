@@ -22,7 +22,7 @@ import java.nio.charset.Charset;
  * WIP !!!! Execute around idiom -
  * http://stackoverflow.com/questions/341971/what-is-the-execute-around-idiom Of
  * course does not work - need methods returning all kinds of things - working
- * on it.
+ * on it. TODO docs
  *
  * @author MrD
  */
@@ -34,12 +34,12 @@ public class FileIO {
 	private static final boolean WARN = false;
 	private static final int BUFFERED_WRITER_SIZE = 8192;
 
-	/***************************/
-	/* execute around methods */
-	/*************************/
+	// =========================================================================
+	// execute around methods
+	// =========================================================================
 	/**
 	 * Writes to the FileOutputStream and closes it. It uses Java 6 API - not
-	 * the android calls for getting the various predefined directories. So
+	 * the android calls - for getting the various predefined directories. So
 	 * should be used for writing to external storage only
 	 *
 	 * @param file
@@ -181,7 +181,7 @@ public class FileIO {
 	}
 
 	public static void write(String filename, String data, Context context,
-			int writeOrAppendMode, String charsetName)
+			String charsetName, int writeOrAppendMode)
 			throws FileNotFoundException, IOException {
 		_write(filename, data, context, writeOrAppendMode, charsetName);
 	}
@@ -234,13 +234,13 @@ public class FileIO {
 	 * Given a File which corresponds to a _directory_ path creates this path if
 	 * it does not exists. The directory path must lie in EXTERNAL storage
 	 *
-	 * @param logdir
+	 * @param directory
 	 *            the File instance whose path must be created
 	 * @return true if the path was created successfully or the path already
 	 *         existed and is a directory, false otherwise
 	 */
-	public static boolean createDirExternal(File logdir) {
-		return logdir.mkdirs() || logdir.isDirectory();
+	public static boolean createDirExternal(File directory) {
+		return directory.mkdirs() || directory.isDirectory();
 	}
 
 	// =========================================================================

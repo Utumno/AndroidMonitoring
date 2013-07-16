@@ -1,5 +1,10 @@
 package gr.uoa.di.monitoring.android;
 
+import android.app.Activity;
+import android.content.ComponentName;
+import android.content.Context;
+import android.content.Intent;
+
 /**
  * Application wide Constants
  *
@@ -36,4 +41,29 @@ public final class C {
 	public static final boolean WARN = true;
 	public static final boolean ERROR = true;
 	public static final int NOT_USED = 0;
+
+	// TODO : docs
+	public static Intent launchSettings(final String action) {
+		// see http://stackoverflow.com/a/7024631/281545
+		// and http://stackoverflow.com/a/13385550/281545 for
+		// FLAG_ACTIVITY_NEW_TASK
+//		final ComponentName gps = new ComponentName("com.android.settings",
+//				settingsClassName);
+		final Intent i = new Intent(action);
+//		i.addCategory(Intent.CATEGORY_LAUNCHER);
+//		i.setComponent(gps);
+		i.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK); // TODO : needed ?
+		return i;
+	}
+
+	// TODO : docs & understand what the flags do/are needed etc
+	public static Intent launchActivity(Context ctx,
+			final Class<? extends Activity> cls) {
+		final ComponentName toLaunch = new ComponentName(ctx, cls);
+		final Intent i = new Intent();
+		i.addCategory(Intent.CATEGORY_LAUNCHER);
+		i.setComponent(toLaunch);
+		i.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+		return i;
+	}
 }
