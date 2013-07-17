@@ -32,4 +32,9 @@ public final class BatteryMonitor extends Monitor {
 	public long getInterval() {
 		return BATTERY_MONITORING_INTERVAL;
 	}
+
+	@Override
+	void cleanup() {
+		// pass
+	}
 }

@@ -16,8 +16,7 @@ import static gr.uoa.di.monitoring.android.C.ac_scan_wifi_enabled;
 
 /**
  * BroadcastReceiver registered to receive wifi scan events. If this is enabled
- * it can only mean that the user had disabled the wireless and I enabled it
- * temporarily to scan for networks. So I disable myself and broadcast to the
+ * it means I wait for network scan. So I disable myself and broadcast to the
  * WiffiMotoringReceiver so it can collect the scan results. I leave wireless
  * open since I am not sure I can have the results if not. Still TODO : what if
  * the user has enabled the wireless again meanwhile ?
@@ -76,6 +75,8 @@ public final class ScanResultsReceiver extends BaseReceiver {
 			d("Disabling myself");
 			// TODO : will I have time to disable myself before some other
 			// intent is received (like disabling network or whatever ?)
+			// FIXME : disabled = true; wont do anything I guess - ALSO move
+			// logic to the Monitor I should not be disabling myself !
 			disabled = true;
 			BaseReceiver.enable(context, DISABLE, this.getClass());
 			d("Directly invoke wifi monitor");

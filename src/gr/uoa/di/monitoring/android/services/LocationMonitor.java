@@ -21,9 +21,8 @@ import static gr.uoa.di.monitoring.android.C.ENABLE;
 import static gr.uoa.di.monitoring.android.C.NOT_USED;
 import static gr.uoa.di.monitoring.android.C.ac_aborting;
 import static gr.uoa.di.monitoring.android.C.ac_location_data;
-import static gr.uoa.di.monitoring.android.C.launchSettings;
+import static gr.uoa.di.monitoring.android.C.launchSettingsIntent;
 
-;
 public final class LocationMonitor extends Monitor {
 
 	private static final long LOCATION_MONITORING_INTERVAL = 2 * 60 * 1000;
@@ -32,10 +31,30 @@ public final class LocationMonitor extends Monitor {
 	private static final int MIN_DISTANCE = 0;
 	// convenience fields
 	private static LocationManager lm; // not final cause we need a f*ng context
+	private static PendingIntent pi; // see above
 	private Providers.Status providerStatus;
 
 	public LocationMonitor() {
 		super(LocationMonitor.class.getSimpleName());
+	}
+
+	@Override
+	public int onStartCommand(Intent intent, int flags, int startId) {
+		init();
+		// be careful to return super
+		return super.onStartCommand(intent, flags, startId);
+	}
+
+	private void init() {
+		Intent i = new Intent(this, LocationReceiver.class);
+		pi = PendingIntent.getBroadcast(this, NOT_USED, i,
+			PendingIntent.FLAG_UPDATE_CURRENT);
+	}
+
+	@Override
+	public void onCreate() {
+		super.onCreate();
+		init();
 	}
 
 	@Override
@@ -45,22 +64,21 @@ public final class LocationMonitor extends Monitor {
 		if (action == null) {
 			// monitor command from the alarm manager
 			final String provider = Providers.getProvider(this);
-			sb.append(" (" + provider + ") ");
 			providerStatus = Providers.getProviderStatus(this, provider);
 			if (providerStatus.notAvailabe()) {
-				// FIXME : alert user & abort
-				// http://stackoverflow.com/questions/6031004/check-if-user-has-enabled-gps-after-prompted
+				sb.append(" (" + provider + ") ");
+				// FIXME : notification !
 				Providers.launchDialog(this, providerStatus);
+				// TODO Listeners providerStatus.waitForChange() instead of
+				// abort
 				w("Aborting : " + sb.toString());
 				abort();
 				return;
 			}
-			Intent i = new Intent(this, LocationReceiver.class);
-			PendingIntent pi = PendingIntent.getBroadcast(this, NOT_USED, i,
-				PendingIntent.FLAG_UPDATE_CURRENT);
-			d("pi : " + pi);
 			d("Enabling the receiver");
 			BaseReceiver.enable(this, ENABLE, LocationReceiver.class);
+			d("Requesting location updates - pi : " + pi);
+			// FIXME check what happens if I register once
 			lm().requestLocationUpdates(provider, MIN_TIME_BETWEEN_SCANS,
 				MIN_DISTANCE, pi);
 		} else if (ac_location_data.equals(action)) {
@@ -70,7 +88,6 @@ public final class LocationMonitor extends Monitor {
 						.get(LocationManager.KEY_LOCATION_CHANGED);
 				if (loc == null) {
 					// FIXME disable the updates
-					// FIXME check what happens if I register once
 					w(sb + "NULL LOCATION  - EXTRAS : " + extras);
 					// if gps is disabled I keep getting this :
 					// NULL LOCATION - EXTRAS : Bundle[{providerEnabled=false}]
@@ -82,14 +99,22 @@ public final class LocationMonitor extends Monitor {
 					sb.append(" (" + provider + ") ");
 					final double lon = loc.getLongitude();
 					final double lat = loc.getLatitude();
+					final long time = loc.getTime();
 					w(sb + "latitude :" + lat + " -- longitude : " + lon);
+					d("Got location - disabling LocationReceiver");
+					BaseReceiver.enable(this, DISABLE, LocationReceiver.class);
 				}
 			} else {
 				w(sb + "NULL EXTRAS");
 			}
 		} else if (ac_aborting.equals(action)) {
-			BaseReceiver.enable(this, DISABLE, LocationReceiver.class);
+			cleanup();
 		}
+	}
+
+	@Override
+	void cleanup() {
+		BaseReceiver.enable(this, DISABLE, LocationReceiver.class);
 	}
 
 	private LocationManager lm() {
@@ -209,9 +234,9 @@ public final class LocationMonitor extends Monitor {
 				switch (this) {
 				case NULL:
 				case UNKNOWN_PROVIDER:
-					return launchSettings(Settings.ACTION_LOCATION_SOURCE_SETTINGS);
+					return launchSettingsIntent(Settings.ACTION_LOCATION_SOURCE_SETTINGS);
 				case NETWORK_NOT_CONNECTED:
-					return launchSettings(Settings.ACTION_WIFI_SETTINGS);
+					return launchSettingsIntent(Settings.ACTION_WIFI_SETTINGS);
 				case GPS:
 				case NETWORK:
 					return null;

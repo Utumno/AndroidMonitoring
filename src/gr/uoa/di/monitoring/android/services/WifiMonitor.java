@@ -107,8 +107,7 @@ public final class WifiMonitor extends Monitor {
 				done = true;
 				d("Get the scan results (null?) - wireless disabled !");
 			} else if (ac_aborting.equals(action)) {
-				done = true;
-				BaseReceiver.enable(this, DISABLE, ScanResultsReceiver.class);
+				cleanup();
 			}
 		} catch (WmNotAvailableException e) {
 			w(e.getMessage(), e);
@@ -125,6 +124,12 @@ public final class WifiMonitor extends Monitor {
 			}
 			w("Finishing " + action);
 		}
+	}
+
+	@Override
+	void cleanup() {
+		done = true;
+		BaseReceiver.enable(this, DISABLE, ScanResultsReceiver.class);
 	}
 
 	/**

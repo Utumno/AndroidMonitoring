@@ -76,6 +76,12 @@ public abstract class Monitor extends WakefulIntentService {
 
 	public abstract long getInterval();
 
+	/**
+	 * Enforces Monitors to define cleanup actions to be performed when
+	 * monitoring is disabled and they receive the ac_aborting action
+	 */
+	abstract void cleanup();
+
 	public static int getInitialDelay() {
 		return INITIAL_DELAY;
 	}
@@ -123,7 +129,7 @@ public abstract class Monitor extends WakefulIntentService {
 	void abort() {
 		CharSequence master_enable = getResources().getText(
 			R.string.enable_monitoring_master_pref_key);
-		AccessPreferences.persist(this, master_enable.toString(), DISABLE);
+		persist(master_enable.toString(), DISABLE);
 		enableMonitoring(this, DISABLE);
 	}
 

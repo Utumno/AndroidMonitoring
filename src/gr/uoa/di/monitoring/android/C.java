@@ -43,7 +43,7 @@ public final class C {
 	public static final int NOT_USED = 0;
 
 	// TODO : docs
-	public static Intent launchSettings(final String action) {
+	public static Intent launchSettingsIntent(final String action) {
 		// see http://stackoverflow.com/a/7024631/281545
 		// and http://stackoverflow.com/a/13385550/281545 for
 		// FLAG_ACTIVITY_NEW_TASK

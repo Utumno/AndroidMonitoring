@@ -8,7 +8,6 @@ import com.commonsware.cwac.wakeful.WakefulIntentService;
 import gr.uoa.di.monitoring.android.services.LocationMonitor;
 import gr.uoa.di.monitoring.android.services.Monitor;
 
-import static gr.uoa.di.monitoring.android.C.DISABLE;
 import static gr.uoa.di.monitoring.android.C.ac_location_data;
 
 public final class LocationReceiver extends BaseReceiver {
@@ -24,9 +23,5 @@ public final class LocationReceiver extends BaseReceiver {
 		i.fillIn(intent, 0); // TODO do I need flags ?
 		i.setAction(ac_location_data.toString());
 		WakefulIntentService.sendWakefulWork(context, i);
-		// FIXME : leave it enabled to check the Listener Updates + move logic
-		// to LocationMonitor
-		d("disabling myself");
-		BaseReceiver.enable(context, DISABLE, LocationReceiver.class);
 	}
 }

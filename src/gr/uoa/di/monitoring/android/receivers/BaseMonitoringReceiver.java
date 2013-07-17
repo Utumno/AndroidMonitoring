@@ -9,12 +9,7 @@ import android.os.SystemClock;
 
 import com.commonsware.cwac.wakeful.WakefulIntentService;
 
-import gr.uoa.di.monitoring.android.services.LocationMonitor;
 import gr.uoa.di.monitoring.android.services.Monitor;
-import gr.uoa.di.monitoring.android.services.WifiMonitor;
-
-import java.util.HashSet;
-import java.util.Set;
 
 import static gr.uoa.di.monitoring.android.C.ac_aborting;
 import static gr.uoa.di.monitoring.android.C.ac_cancel_alarm;
@@ -47,11 +42,6 @@ public abstract class BaseMonitoringReceiver extends BaseReceiver {
 	private static final int NOT_USED = 0;
 	@SuppressWarnings("unused")
 	private static final int NULL_FLAGS = 0;
-	private static final Set<Class<? extends Monitor>> NEED_CLEANUP = new HashSet<Class<? extends Monitor>>();
-	static {
-		NEED_CLEANUP.add(LocationMonitor.class);
-		NEED_CLEANUP.add(WifiMonitor.class);
-	}
 
 	@Override
 	final public void onReceive(Context context, Intent intent) {
@@ -92,11 +82,9 @@ public abstract class BaseMonitoringReceiver extends BaseReceiver {
 				throw new IllegalStateException(UNABLE_TO_SET_ALARMS, e);
 			}
 		} else {
-			if (NEED_CLEANUP.contains(monitor_class_)) {
-				Intent i = new Intent(ac_aborting.toString(), Uri.EMPTY,
-						context, monitor_class_);
-				WakefulIntentService.sendWakefulWork(context, i);
-			}
+			Intent i = new Intent(ac_aborting.toString(), Uri.EMPTY, context,
+					monitor_class_);
+			WakefulIntentService.sendWakefulWork(context, i);
 			am.cancel(pi);
 		}
 		w("alarms " + (setup ? "enabled" : "disabled"));
