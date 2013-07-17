@@ -12,6 +12,7 @@ import android.provider.Settings;
 
 import gr.uoa.di.monitoring.android.activities.DialogActivity;
 import gr.uoa.di.monitoring.android.receivers.BaseReceiver;
+import gr.uoa.di.monitoring.android.receivers.LocationMonitoringReceiver;
 import gr.uoa.di.monitoring.android.receivers.LocationReceiver;
 
 import java.util.Arrays;
@@ -78,9 +79,11 @@ public final class LocationMonitor extends Monitor {
 			d("Enabling the receiver");
 			BaseReceiver.enable(this, ENABLE, LocationReceiver.class);
 			d("Requesting location updates - pi : " + pi);
-			// FIXME check what happens if I register once
 			lm().requestLocationUpdates(provider, MIN_TIME_BETWEEN_SCANS,
 				MIN_DISTANCE, pi);
+			// check what happens if I register for location updates once
+			BaseReceiver
+					.enable(this, DISABLE, LocationMonitoringReceiver.class);
 		} else if (ac_location_data.equals(action)) {
 			final Bundle extras = intent.getExtras();
 			if (extras != null) {
@@ -102,7 +105,8 @@ public final class LocationMonitor extends Monitor {
 					final long time = loc.getTime();
 					w(sb + "latitude :" + lat + " -- longitude : " + lon);
 					d("Got location - disabling LocationReceiver");
-					BaseReceiver.enable(this, DISABLE, LocationReceiver.class);
+					// BaseReceiver.enable(this, DISABLE,
+					// LocationReceiver.class);
 				}
 			} else {
 				w(sb + "NULL EXTRAS");
