@@ -1,9 +1,13 @@
 package gr.uoa.di.monitoring.android;
 
 import android.app.Activity;
+import android.app.Notification;
+import android.app.NotificationManager;
+import android.app.PendingIntent;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
+import android.support.v4.app.NotificationCompat;
 
 /**
  * Application wide Constants
@@ -42,28 +46,52 @@ public final class C {
 	public static final boolean ERROR = true;
 	public static final int NOT_USED = 0;
 
-	// TODO : docs
+	// TODO : docs/test
 	public static Intent launchSettingsIntent(final String action) {
 		// see http://stackoverflow.com/a/7024631/281545
 		// and http://stackoverflow.com/a/13385550/281545 for
 		// FLAG_ACTIVITY_NEW_TASK
-//		final ComponentName gps = new ComponentName("com.android.settings",
-//				settingsClassName);
+		// final ComponentName gps = new ComponentName("com.android.settings",
+		// settingsClassName);
 		final Intent i = new Intent(action);
-//		i.addCategory(Intent.CATEGORY_LAUNCHER);
-//		i.setComponent(gps);
+		// i.addCategory(Intent.CATEGORY_LAUNCHER);
+		// i.setComponent(gps);
 		i.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK); // TODO : needed ?
 		return i;
 	}
 
-	// TODO : docs & understand what the flags do/are needed etc
-	public static Intent launchActivity(Context ctx,
+	// TODO : docs/test & understand what the flags do/are needed etc
+	// especially to stop having my app's task brought to foreground with the
+	// DialogActivity
+	public static Intent launchActivityIntent(Context ctx,
 			final Class<? extends Activity> cls) {
 		final ComponentName toLaunch = new ComponentName(ctx, cls);
 		final Intent i = new Intent();
-		i.addCategory(Intent.CATEGORY_LAUNCHER);
+		// i.addCategory(Intent.CATEGORY_LAUNCHER);
 		i.setComponent(toLaunch);
-		i.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+		// i.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
 		return i;
+	}
+
+	// TODO : docs/test & understand what the flags do/are needed etc
+	public static void triggerNotification(Context context, CharSequence title,
+			CharSequence message, Intent intent, String tag, int id) {
+		PendingIntent pi = PendingIntent.getActivity(context, NOT_USED, intent,
+			PendingIntent.FLAG_UPDATE_CURRENT); // PendingIntent.FLAG_UPDATE_CURRENT?
+		Notification not = new NotificationCompat.Builder(context)
+				.setContentTitle(title).setContentText(message)
+				.setContentIntent(pi)
+				// this ^^^ must be set in my API (2.3.7) version otherwise I
+				// get IllegalArgumentException: contentIntent required
+				.setAutoCancel(true) // cancel on click
+				.setSmallIcon(R.drawable.ic_launcher) // TODO : icons
+				// had android.R.drawable.stat_notify_error
+				// .setDefaults(Notification.DEFAULT_ALL) // needs permissions
+				// .setOngoing(ONGOING) // not needed apparently
+				// .setLargeIcon(aBitmap)
+				.build();
+		NotificationManager notificationManager = (NotificationManager) context
+				.getSystemService(Context.NOTIFICATION_SERVICE);
+		notificationManager.notify(tag, id, not);
 	}
 }

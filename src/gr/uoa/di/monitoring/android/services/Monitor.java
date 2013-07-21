@@ -127,10 +127,13 @@ public abstract class Monitor extends WakefulIntentService {
 	}
 
 	void abort() {
-		CharSequence master_enable = getResources().getText(
-			R.string.enable_monitoring_master_pref_key);
-		persist(master_enable.toString(), DISABLE);
-		enableMonitoring(this, DISABLE);
+		synchronized (Monitor.class) {
+			String master_enable = getResources().getText(
+				R.string.enable_monitoring_master_pref_key).toString();
+			if (!retrieve(master_enable, DISABLE)) return; // already disabled
+			persist(master_enable, DISABLE);
+			enableMonitoring(this, DISABLE);
+		}
 	}
 
 	/**

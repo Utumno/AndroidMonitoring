@@ -16,11 +16,11 @@ public final class AccessPreferences {
 
 	private static final List<Class<?>> CLASSES = new ArrayList<Class<?>>();
 	static {
+		CLASSES.add(String.class);
 		CLASSES.add(Boolean.class);
-		CLASSES.add(Float.class);
 		CLASSES.add(Integer.class);
 		CLASSES.add(Long.class);
-		CLASSES.add(String.class);
+		CLASSES.add(Float.class);
 		CLASSES.add(Set.class);
 	}
 
@@ -28,6 +28,7 @@ public final class AccessPreferences {
 
 	private static SharedPreferences prefs;
 
+	// TODO: do I need synchronized ?
 	private static synchronized SharedPreferences getPrefs(Context ctx) {
 		if (prefs == null) {
 			prefs = PreferenceManager.getDefaultSharedPreferences(ctx);
@@ -35,8 +36,6 @@ public final class AccessPreferences {
 		return prefs;
 	}
 
-	// TODO: threads ?
-	// TODO : nulls ?
 	@TargetApi(Build.VERSION_CODES.HONEYCOMB)
 	public static <T> void persist(Context ctx, String key, T value) {
 		@SuppressLint("CommitPrefEdits")
@@ -46,20 +45,20 @@ public final class AccessPreferences {
 			// as anything but if you give get() a default non null value it
 			// will give this default value back
 			ed.putString(key, null);
-		} else if (value instanceof Boolean) ed
-				.putBoolean(key, (Boolean) value);
-		else if (value instanceof Float) ed.putFloat(key, (Float) value);
-		// TODO : CORRECT ORDER OF INTEGER AND LONG
+		} else if (value instanceof String) ed.putString(key, (String) value);
+		else if (value instanceof Boolean) ed.putBoolean(key, (Boolean) value);
+		// TODO : IS THE ORDER OF FLOAT, INTEGER AND LONG CORRECT ?
 		else if (value instanceof Integer) ed.putInt(key, (Integer) value);
 		else if (value instanceof Long) ed.putLong(key, (Long) value);
-		else if (value instanceof String) ed.putString(key, (String) value);
+		else if (value instanceof Float) ed.putFloat(key, (Float) value);
 		else if (value instanceof Set) {
 			if (android.os.Build.VERSION.SDK_INT < Build.VERSION_CODES.HONEYCOMB) {
 				throw new IllegalStateException(
 						"You can add sets in the preferences only after API "
 							+ Build.VERSION_CODES.HONEYCOMB);
 			}
-			// The given set does not contain strings only --> not my problem
+			// The given set does not contain strings only --> TODO : not my
+			// problem ? probably cause the one who filled it made the mistake
 			// Set<?> set = (Set<?>) value;
 			// if (!set.isEmpty()) {
 			// for (Object object : set) {
@@ -89,15 +88,20 @@ public final class AccessPreferences {
 			final Object value = getPrefs(ctx).getAll().get(key);
 			// ..if null I return null
 			if (value == null) return null;
-			// ..if not null I get the value of the class. Problem is that as
-			// far as the type system is concerned T is of the type the variable
-			// that is to receive the default value is. So :
+			// ..if not null I get the class of the non null value. Problem is
+			// that as far as the type system is concerned T is of the type the
+			// variable that is to receive the default value is. So :
 			// String s = AccessPreferences.retrieve(this, "key", null);
-			// if the value stored in is not a String for instance `"key" -->
-			// true` or `"key" --> 1.2` a ClassCastException will
+			// if the value stored in "key" is not a String for instance
+			// `"key" --> true` or `"key" --> 1.2` a ClassCastException will
 			// occur _in the assignment_ after retrieve returns
+			// TODO : is it my problem ? This :
+			// SharedPreferences p =
+			// PreferenceManager.getDefaultSharedPreferences(ctx);
+			// int i = p.getInt(KEY_FOR_STRING, 7);
+			// results in a class cast exception as well !
 			final Class<?> clazz = value.getClass();
-			// TODO : CORRECT ORDER OF INTEGER AND LONG
+			// TODO : IS THE ORDER OF FLOAT, INTEGER AND LONG CORRECT ?
 			for (Class<?> cls : CLASSES) {
 				if (clazz.isAssignableFrom(cls)) {
 					try {
@@ -123,24 +127,25 @@ public final class AccessPreferences {
 			// that's really Illegal State I guess
 			throw new IllegalStateException("Unknown class for value :\n\t"
 				+ value + "\nstored in preferences");
-		} else if (defaultValue instanceof Boolean) return (T) (Boolean) getPrefs(
+		} else if (defaultValue instanceof String) return (T) getPrefs(ctx)
+				.getString(key, (String) defaultValue);
+		else if (defaultValue instanceof Boolean) return (T) (Boolean) getPrefs(
 			ctx).getBoolean(key, (Boolean) defaultValue);
-		else if (defaultValue instanceof Float) return (T) (Float) getPrefs(ctx)
-				.getFloat(key, (Float) defaultValue);
-		// TODO : CORRECT ORDER OF INTEGER AND LONG
+		// TODO : IS THE ORDER OF FLOAT, INTEGER AND LONG CORRECT ?
 		else if (defaultValue instanceof Integer) return (T) (Integer) getPrefs(
 			ctx).getInt(key, (Integer) defaultValue);
 		else if (defaultValue instanceof Long) return (T) (Long) getPrefs(ctx)
 				.getLong(key, (Long) defaultValue);
-		else if (defaultValue instanceof String) return (T) getPrefs(ctx)
-				.getString(key, (String) defaultValue);
+		else if (defaultValue instanceof Float) return (T) (Float) getPrefs(ctx)
+				.getFloat(key, (Float) defaultValue);
 		else if (defaultValue instanceof Set) {
 			if (android.os.Build.VERSION.SDK_INT < Build.VERSION_CODES.HONEYCOMB) {
 				throw new IllegalStateException(
 						"You can add sets in the preferences only after API "
 							+ Build.VERSION_CODES.HONEYCOMB);
 			}
-			// The given set does not contain strings only --> not my problem
+			// The given set does not contain strings only --> TODO : not my
+			// problem ? probably cause the one who filled it made the mistake
 			// Set<?> set = (Set<?>) defaultValue;
 			// if (!set.isEmpty()) {
 			// for (Object object : set) {

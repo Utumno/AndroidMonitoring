@@ -7,6 +7,7 @@ import android.location.Criteria;
 import android.location.Location;
 import android.location.LocationManager;
 import android.net.ConnectivityManager;
+import android.net.wifi.WifiManager;
 import android.os.Bundle;
 import android.provider.Settings;
 
@@ -22,15 +23,21 @@ import static gr.uoa.di.monitoring.android.C.NOT_USED;
 import static gr.uoa.di.monitoring.android.C.ac_aborting;
 import static gr.uoa.di.monitoring.android.C.ac_location_data;
 import static gr.uoa.di.monitoring.android.C.launchSettingsIntent;
+import static gr.uoa.di.monitoring.android.C.triggerNotification;
 
 public final class LocationMonitor extends Monitor {
 
 	private static final long LOCATION_MONITORING_INTERVAL = 2 * 60 * 1000;
+	private static final Class<? extends BaseReceiver> PERSONAL_RECEIVER = LocationReceiver.class;
 	// Location api calls constants
-	private static final int MIN_TIME_BETWEEN_SCANS = 1 * 30 * 1000;
+	private static final int MIN_TIME_BETWEEN_SCANS = 1 * 30 * 1000; // 30 secs
 	private static final int MIN_DISTANCE = 0;
+	public static final String NOTIFICATION_TAG = LocationMonitor.class
+			.getSimpleName() + ".Notification";
+	public static final int NOTIFICATION_ID = 9200;
 	// convenience fields
 	private static LocationManager lm; // not final cause we need a f*ng context
+	// members
 	private static PendingIntent pi; // see above
 	private Providers.Status providerStatus;
 
@@ -46,7 +53,7 @@ public final class LocationMonitor extends Monitor {
 	}
 
 	private void init() {
-		Intent i = new Intent(this, LocationReceiver.class);
+		Intent i = new Intent(this, PERSONAL_RECEIVER);
 		pi = PendingIntent.getBroadcast(this, NOT_USED, i,
 			PendingIntent.FLAG_UPDATE_CURRENT);
 	}
@@ -67,18 +74,18 @@ public final class LocationMonitor extends Monitor {
 			providerStatus = Providers.getProviderStatus(this, provider);
 			if (providerStatus.notAvailabe()) {
 				sb.append(" (" + provider + ") ");
-				// FIXME : notification !
-				Providers.launchDialog(this, providerStatus);
 				// TODO Listeners providerStatus.waitForChange() instead of
 				// abort
 				w("Aborting : " + sb.toString());
 				abort();
+				// Providers.launchDialog(this, providerStatus);
+				Providers.launchNotification(this, providerStatus);
 				return;
 			}
+			// FIXME : maybe enable & DISABLE once ?
 			d("Enabling the receiver");
-			BaseReceiver.enable(this, ENABLE, LocationReceiver.class);
+			receiver(ENABLE);
 			d("Requesting location updates - pi : " + pi);
-			// FIXME check what happens if I register once
 			lm().requestLocationUpdates(provider, MIN_TIME_BETWEEN_SCANS,
 				MIN_DISTANCE, pi);
 		} else if (ac_location_data.equals(action)) {
@@ -87,13 +94,7 @@ public final class LocationMonitor extends Monitor {
 				final Location loc = (Location) extras
 						.get(LocationManager.KEY_LOCATION_CHANGED);
 				if (loc == null) {
-					// FIXME disable the updates
 					w(sb + "NULL LOCATION  - EXTRAS : " + extras);
-					// if gps is disabled I keep getting this :
-					// NULL LOCATION - EXTRAS : Bundle[{providerEnabled=false}]
-					// as soon as I enable the provider I get
-					// W/GpsLocationProvider(851): Unneeded remove listener for
-					// uid 1000
 				} else {
 					final String provider = loc.getProvider();
 					sb.append(" (" + provider + ") ");
@@ -102,7 +103,14 @@ public final class LocationMonitor extends Monitor {
 					final long time = loc.getTime();
 					w(sb + "latitude :" + lat + " -- longitude : " + lon);
 					d("Got location - disabling LocationReceiver");
-					BaseReceiver.enable(this, DISABLE, LocationReceiver.class);
+					receiver(DISABLE);
+					d("Got location - removing updates");
+					// FIXME : will it remove updates for any and all location
+					// providers for the same pending intent ?
+					// requestLocationUpdates above will register the same
+					// updates for the same pending intent pi ?
+					// maybe I'll screw up my next update request ?
+					lm().removeUpdates(pi);
 				}
 			} else {
 				w(sb + "NULL EXTRAS");
@@ -112,9 +120,14 @@ public final class LocationMonitor extends Monitor {
 		}
 	}
 
+	private void receiver(final boolean enable) {
+		BaseReceiver.enable(this, enable, PERSONAL_RECEIVER);
+	}
+
 	@Override
 	void cleanup() {
-		BaseReceiver.enable(this, DISABLE, LocationReceiver.class);
+		receiver(DISABLE);
+		lm().removeUpdates(pi); // TODO : maybe check if requested ?
 	}
 
 	private LocationManager lm() {
@@ -151,7 +164,7 @@ public final class LocationMonitor extends Monitor {
 			CRITERIA.setSpeedRequired(false);
 		}
 
-		private static String getProvider(LocationMonitor m) {
+		private static String getProvider(final LocationMonitor m) {
 			return m.lm().getBestProvider(CRITERIA, ENABLE);
 		}
 
@@ -159,9 +172,17 @@ public final class LocationMonitor extends Monitor {
 			if (s.equals(null)) return Status.NULL;
 			if (s.equals(LocationManager.GPS_PROVIDER)) return Status.GPS;
 			if (s.equals(LocationManager.NETWORK_PROVIDER)) {
+				// Check if wireless is enabled
+				WifiManager wm = (WifiManager) ctx
+						.getSystemService(Context.WIFI_SERVICE);
+				if (!wm.isWifiEnabled()) {
+					return Status.NETWORK_NOT_ENABLED;
+				}
 				ConnectivityManager cm = (ConnectivityManager) ctx
 						.getSystemService(CONNECTIVITY_SERVICE);
 				Boolean isWifi = cm.getNetworkInfo(
+				// TODO : isConnectedOrConnecting ? long periods of no
+				// connection go unnoticed
 					ConnectivityManager.TYPE_WIFI).isConnectedOrConnecting();
 				if (isWifi) {
 					return Status.NETWORK;
@@ -171,9 +192,19 @@ public final class LocationMonitor extends Monitor {
 			return Status.UNKNOWN_PROVIDER;
 		}
 
+		@SuppressWarnings("unused")
 		private static void launchDialog(Context ctx, Status stat) {
 			DialogActivity.launchDialogActivity(ctx, stat.title(),
 				stat.notification(), stat.launchIntent());
+		}
+
+		private static void launchNotification(Context ctx, Status stat) {
+			Intent intent = DialogActivity.launchDialogActivityIntent(ctx,
+				stat.title(), stat.dialog(), stat.launchIntent());
+			// intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK); // nope
+			triggerNotification(ctx, stat.title(), stat.notification(), intent,
+				LocationMonitor.NOTIFICATION_TAG,
+				LocationMonitor.NOTIFICATION_ID);
 		}
 
 		@SuppressWarnings("unused")
@@ -182,7 +213,8 @@ public final class LocationMonitor extends Monitor {
 		}
 
 		private enum Status {
-			GPS, NETWORK, NETWORK_NOT_CONNECTED, NULL, UNKNOWN_PROVIDER;
+			GPS, NETWORK, NETWORK_NOT_ENABLED, NETWORK_NOT_CONNECTED, NULL,
+			UNKNOWN_PROVIDER;
 
 			// TODO : add a constant on gps status GPS_NO_FIX
 			// FIXME : move messages to resources
@@ -199,6 +231,8 @@ public final class LocationMonitor extends Monitor {
 					return "Network location";
 				case UNKNOWN_PROVIDER:
 					return "Unknown location provider";
+				case NETWORK_NOT_ENABLED:
+					return "Enable wifi";
 				}
 				throw new IllegalStateException("Forgotten enum constant");
 			}
@@ -206,25 +240,53 @@ public final class LocationMonitor extends Monitor {
 			private String notification() {
 				switch (this) {
 				case NULL:
-					return "Your location services are disabled. "
-						+ "Monitoring will stop. Would you like to enable "
-						+ "them and restart monitoring ?\n";
+					return "No location services. Monitoring has stopped.";
 				case NETWORK_NOT_CONNECTED:
-					return "You are not connected to a wireless network. "
-						+ "Monitoring will stop. Would you like to connect  "
-						+ "a network and restart monitoring ?\n";
+					return "No wireless connection. Monitoring has stopped.";
+				case NETWORK_NOT_ENABLED:
+					return "No network/gps open. Monitoring has stopped.";
 				case GPS:
 					return "Location is provided by GPS. That is the best "
 						+ "option for monitoring the location if outdoors. "
 						+ "Please if indoors connect to a wireless network\n";
 				case NETWORK:
-					return "Location is provided by your connection to a "
-						+ "wireless network. That is the best option for "
-						+ "monitoring the location if outdoors. Please consider"
-						+ " connecting to the GPS provider while outdoors\n";
+					return "Location is provided by your wireless connection. "
+						+ "That is the best option for monitoring the location"
+						+ " if outdoors. Please consider connecting to the GPS "
+						+ "provider while outdoors\n";
+				case UNKNOWN_PROVIDER:
+					return "No known location services. Monitoring has "
+						+ "stopped.";
+				}
+				throw new IllegalStateException("Forgotten enum constant");
+			}
+
+			private String dialog() {
+				switch (this) {
+				case NULL:
+					return "Your location services are disabled. "
+						+ "Monitoring has stopped. Would you like to enable "
+						+ "them and restart monitoring ?\n";
+				case NETWORK_NOT_CONNECTED:
+					return "You are not connected to a wireless network. "
+						+ "Monitoring has stopped. Would you like to connect  "
+						+ "a network and restart monitoring ?\n";
+				case NETWORK_NOT_ENABLED:
+					return "You must enable wifi (or preferably GPS if you "
+						+ "are outdoors). Monitoring has stopped.  Would you "
+						+ "like to enable wifi and restart monitoring ?\n";
+				case GPS:
+					return "Location is provided by GPS. That is the best "
+						+ "option for monitoring the location if outdoors. "
+						+ "Please if indoors connect to a wireless network\n";
+				case NETWORK:
+					return "Location is provided by your wireless connection. "
+						+ "That is the best option for monitoring the location"
+						+ " if outdoors. Please consider connecting to the GPS "
+						+ "provider while outdoors\n";
 				case UNKNOWN_PROVIDER:
 					return "Your location services are new to us. "
-						+ "Monitoring will stop. Please enable GPS or if "
+						+ "Monitoring has stopped. Please enable GPS or if "
 						+ "indoors connect to a wireless network\n";
 				}
 				throw new IllegalStateException("Forgotten enum constant");
@@ -236,6 +298,7 @@ public final class LocationMonitor extends Monitor {
 				case UNKNOWN_PROVIDER:
 					return launchSettingsIntent(Settings.ACTION_LOCATION_SOURCE_SETTINGS);
 				case NETWORK_NOT_CONNECTED:
+				case NETWORK_NOT_ENABLED:
 					return launchSettingsIntent(Settings.ACTION_WIFI_SETTINGS);
 				case GPS:
 				case NETWORK:

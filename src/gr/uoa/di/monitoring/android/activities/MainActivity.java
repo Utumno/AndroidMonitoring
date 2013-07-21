@@ -38,6 +38,13 @@ public class MainActivity extends BaseActivity implements OnClickListener {
 		// }
 		PackageInfo pInfo = packageInfo();
 		v("On create finished (" + pInfo.versionCode + ")");
+		// SharedPreferences p = PreferenceManager
+		// .getDefaultSharedPreferences(this);
+		// int i = p.getInt(
+		// getResources().getText(R.string.enable_monitoring_master_pref_key)
+		// .toString(),
+		// 7);
+		// v("(Bet I get a )class cast exception : " + i);
 	}
 
 	private PackageInfo packageInfo() {

@@ -26,11 +26,13 @@ import static gr.uoa.di.monitoring.android.C.ac_aborting;
 import static gr.uoa.di.monitoring.android.C.ac_scan_results_available;
 import static gr.uoa.di.monitoring.android.C.ac_scan_wifi_disabled;
 import static gr.uoa.di.monitoring.android.C.ac_scan_wifi_enabled;
+import static gr.uoa.di.monitoring.android.C.triggerNotification;
 
 public final class WifiMonitor extends Monitor {
 
 	// TODO : timeout wait()
 	private static final long WIFI_MONITORING_INTERVAL = 1 * 60 * 1000;
+	private static final Class<? extends BaseReceiver> PERSONAL_RECEIVER = ScanResultsReceiver.class;
 	// Internal preferences keys - persist state even on unloading app classes
 	private static final String HAVE_ENABLED_WIFI_PREF_KEY = APP_PACKAGE_NAME
 		+ ".HAVE_ENABLED_WIFI_PREF_KEY";
@@ -73,7 +75,7 @@ public final class WifiMonitor extends Monitor {
 				// monitor command from the alarm manager
 				cleanUp(); // FIXME !
 				d("Enabling the receiver");
-				BaseReceiver.enable(this, ENABLE, ScanResultsReceiver.class);
+				receiver(ENABLE);
 				d("Check if wireless is enabled");
 				if (!wm.isWifiEnabled()) {
 					// enable wifi AFTER enabling the receiver
@@ -84,10 +86,10 @@ public final class WifiMonitor extends Monitor {
 						d("Note to self I should disable again");
 						keepNoteToDisableWireless(true);
 					} else {
-						// TODO: maybe shut down Monitoring ?
-						w("Unable to enable wireless - maybe shut down Monitoring ?");
-						BaseReceiver.enable(this, DISABLE,
-							ScanResultsReceiver.class);
+						w("Unable to enable wireless - aborting");
+						abort();
+						launchNotification(this, Status.CANT_ENABLE_WIFI);
+						receiver(DISABLE);
 						return;
 					}
 					// wifi lock AND WAKE LOCK (Gatekeeper)-so must be here!
@@ -111,7 +113,9 @@ public final class WifiMonitor extends Monitor {
 			}
 		} catch (WmNotAvailableException e) {
 			w(e.getMessage(), e);
-			// TODO: maybe shut down Monitoring ?
+			abort();
+			launchNotification(this, Status.WIFI_MANAGER_UNAVAILABLE);
+			return;
 		} finally {
 			synchronized (Gatekeeper.WIFI_MONITOR) {
 				if (done) {
@@ -126,10 +130,14 @@ public final class WifiMonitor extends Monitor {
 		}
 	}
 
+	private void receiver(final boolean enable) {
+		BaseReceiver.enable(this, enable, PERSONAL_RECEIVER);
+	}
+
 	@Override
 	void cleanup() {
 		done = true;
-		BaseReceiver.enable(this, DISABLE, ScanResultsReceiver.class);
+		receiver(DISABLE);
 	}
 
 	/**
@@ -147,7 +155,7 @@ public final class WifiMonitor extends Monitor {
 		if (haveEnabledWifi()) {
 			w("Oops - I have enabled wifi and never disabled - receiver not run");
 			w("but it is still enabled so disable it first.");
-			BaseReceiver.enable(this, DISABLE, ScanResultsReceiver.class);
+			receiver(DISABLE);
 			w("Clean up lock");
 			synchronized (Gatekeeper.WIFI_MONITOR) {
 				Gatekeeper.WIFI_MONITOR.notify();
@@ -330,5 +338,35 @@ public final class WifiMonitor extends Monitor {
 		if (wm == null)
 			wm = (WifiManager) context.getSystemService(Context.WIFI_SERVICE);
 		if (wm == null) throw new WmNotAvailableException();
+	}
+
+	private static void launchNotification(Context ctx, Status stat) {
+		Intent intent = new Intent();
+		triggerNotification(ctx, stat.title(), stat.notification(), intent,
+			LocationMonitor.NOTIFICATION_TAG, LocationMonitor.NOTIFICATION_ID);
+	}
+
+	private enum Status {
+		WIFI_MANAGER_UNAVAILABLE, CANT_ENABLE_WIFI;
+
+		private String title() {
+			switch (this) {
+			case CANT_ENABLE_WIFI:
+				return "Can not enable wifi";
+			case WIFI_MANAGER_UNAVAILABLE:
+				return "No wifi detected";
+			}
+			throw new IllegalStateException("Forgotten enum constant");
+		}
+
+		private String notification() {
+			switch (this) {
+			case WIFI_MANAGER_UNAVAILABLE:
+				return "No wireless services. Monitoring has stopped.";
+			case CANT_ENABLE_WIFI:
+				return "Can not enable wifi. Monitoring has stopped.";
+			}
+			throw new IllegalStateException("Forgotten enum constant");
+		}
 	}
 }

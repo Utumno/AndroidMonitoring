@@ -10,7 +10,7 @@ import android.widget.TextView;
 
 import gr.uoa.di.monitoring.android.R;
 
-import static gr.uoa.di.monitoring.android.C.launchActivity;
+import static gr.uoa.di.monitoring.android.C.launchActivityIntent;
 
 public class DialogActivity extends BaseActivity implements OnClickListener {
 
@@ -78,6 +78,7 @@ public class DialogActivity extends BaseActivity implements OnClickListener {
 		case R.id.dialog_activity_yes_button:
 			DialogActivity.this.startActivity(mIntent);
 			finish(); // TODO : launch another activity (my Settings activity)
+			// check CATEGORY_PREFERENCE ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 			break;
 		case R.id.dialog_activity_no_button:
 			finish();
@@ -87,13 +88,21 @@ public class DialogActivity extends BaseActivity implements OnClickListener {
 
 	public static void launchDialogActivity(Context ctx, final String title,
 			final String text, final Intent intentToLaunchOnYes) {
+		final Intent i = launchDialogActivityIntent(ctx, title, text,
+			intentToLaunchOnYes);
+		ctx.startActivity(i);
+	}
+
+	public static Intent launchDialogActivityIntent(Context ctx,
+			final String title, final String text,
+			final Intent intentToLaunchOnYes) {
 		Bundle extras = new Bundle();
 		extras = setDialogText(extras, text);
 		extras = setDialogTitle(extras, title);
 		extras = setDialogIntent(extras, intentToLaunchOnYes);
 		final Class<DialogActivity> cls = DialogActivity.class;
-		final Intent i = launchActivity(ctx, cls);
+		final Intent i = launchActivityIntent(ctx, cls);
 		i.putExtras(extras);
-		ctx.startActivity(i);
+		return i;
 	}
 }

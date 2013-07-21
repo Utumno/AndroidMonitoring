@@ -50,14 +50,10 @@ public class SettingsActivity extends PreferenceActivity {
 	private OnPreferenceChangeListener listener;
 	private static Preference master_pref;
 
-	public static String masterPrefKey() {
-		return master_enable.toString();
-	}
-
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
-		master_enable = this.getResources().getText(
+		master_enable = getResources().getText(
 			R.string.enable_monitoring_master_pref_key);
 		listener = new ToggleMonitoringListener();
 	}
