@@ -4,16 +4,13 @@ import android.content.BroadcastReceiver;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.pm.PackageManager;
-import android.util.Log;
 
-import static gr.uoa.di.monitoring.android.C.DEBUG;
-import static gr.uoa.di.monitoring.android.C.VERBOSE;
-import static gr.uoa.di.monitoring.android.C.WARN;
+import gr.uoa.di.monitoring.android.C;
+import gr.uoa.di.monitoring.android.Logging;
 
-public abstract class BaseReceiver extends BroadcastReceiver {
+public abstract class BaseReceiver extends BroadcastReceiver implements Logging {
 
 	protected final static String TAG = BaseReceiver.class.getSimpleName();
-	private static final String CHARSET_NAME = "ASCII";
 	private final String tag_ = this.getClass().getSimpleName();
 
 	/**
@@ -36,35 +33,29 @@ public abstract class BaseReceiver extends BroadcastReceiver {
 			Class<? extends BaseReceiver> receiver) {
 		PackageManager pacman = context.getPackageManager();
 		final ComponentName componentName = new ComponentName(context, receiver);
-		if (VERBOSE) Log.v(TAG, componentName.toString());
+		C.v(TAG, componentName.toString());
 		final int state = (enable) ? PackageManager.COMPONENT_ENABLED_STATE_ENABLED
 				: PackageManager.COMPONENT_ENABLED_STATE_DISABLED;
 		pacman.setComponentEnabledSetting(componentName, state,
 			PackageManager.DONT_KILL_APP);
-		if (VERBOSE)
-			Log.v(TAG,
-				"pacman : " + pacman.getComponentEnabledSetting(componentName));
+		C.v(TAG, "pacman : " + pacman.getComponentEnabledSetting(componentName));
 	}
 
 	// =========================================================================
 	// LOGGING
 	// =========================================================================
-	void w(String msg) {
-		if (!WARN) return;
-		Log.w(tag_, msg); // why I do not use w() is left as an exercise
-		if (!DEBUG) return;
-		// try {
-		// File outputFile = FileIO.fileExternalTopLevel(LOG_DIR, LOG_FILE,
-		// null);
-		// FileIO.append(outputFile, msg + "\n", CHARSET_NAME);
-		// } catch (FileNotFoundException e) {
-		// Log.w(tag_, e);
-		// } catch (IOException e) {
-		// Log.w(tag_, e);
-		// }
+	@Override
+	public void w(String msg) {
+		C.w(tag_, msg);
 	}
 
-	void d(String msg) {
-		if (DEBUG) Log.d(tag_, msg);
+	@Override
+	public void d(String msg) {
+		C.d(tag_, msg);
+	}
+
+	@Override
+	public void v(String msg) {
+		C.v(tag_, msg);
 	}
 }

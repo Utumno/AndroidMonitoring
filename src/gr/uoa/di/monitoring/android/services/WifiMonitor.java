@@ -117,7 +117,7 @@ public final class WifiMonitor extends Monitor {
 				cleanup();
 			}
 		} catch (WmNotAvailableException e) {
-			w(e.getMessage(), e);
+			w(e.getMessage());
 			abort();
 			launchNotification(this, Status.WIFI_MANAGER_UNAVAILABLE);
 			return;

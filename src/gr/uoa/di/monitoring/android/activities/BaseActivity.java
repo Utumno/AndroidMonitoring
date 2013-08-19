@@ -1,15 +1,13 @@
 package gr.uoa.di.monitoring.android.activities;
 
 import android.app.Activity;
-import android.util.Log;
 import android.view.Menu;
 
+import gr.uoa.di.monitoring.android.C;
+import gr.uoa.di.monitoring.android.Logging;
 import gr.uoa.di.monitoring.android.R;
 
-import static gr.uoa.di.monitoring.android.C.DEBUG;
-import static gr.uoa.di.monitoring.android.C.VERBOSE;
-
-abstract class BaseActivity extends Activity {
+abstract class BaseActivity extends Activity implements Logging {
 
 	protected final static int UNDEFINED = -1;
 	/**
@@ -28,11 +26,18 @@ abstract class BaseActivity extends Activity {
 	// =========================================================================
 	// LOGGING
 	// =========================================================================
-	void d(String msg) {
-		if (DEBUG) Log.d(tag_, msg);
+	@Override
+	public void w(String msg) {
+		C.w(tag_, msg);
 	}
 
-	void v(String msg) {
-		if (VERBOSE) Log.v(tag_, msg);
+	@Override
+	public void d(String msg) {
+		C.d(tag_, msg);
+	}
+
+	@Override
+	public void v(String msg) {
+		C.v(tag_, msg);
 	}
 }

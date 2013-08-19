@@ -9,7 +9,9 @@ import android.util.Log;
 import com.commonsware.cwac.wakeful.WakefulIntentService;
 
 import gr.uoa.di.monitoring.android.AccessPreferences;
+import gr.uoa.di.monitoring.android.C;
 import gr.uoa.di.monitoring.android.FileIO;
+import gr.uoa.di.monitoring.android.Logging;
 import gr.uoa.di.monitoring.android.R;
 import gr.uoa.di.monitoring.android.persist.FileStore;
 import gr.uoa.di.monitoring.android.persist.FileStore.Fields;
@@ -27,17 +29,12 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 
-import static gr.uoa.di.monitoring.android.C.DEBUG;
 import static gr.uoa.di.monitoring.android.C.DISABLE;
-import static gr.uoa.di.monitoring.android.C.INFO;
 import static gr.uoa.di.monitoring.android.C.ISO8859;
-import static gr.uoa.di.monitoring.android.C.LOG_DIR;
-import static gr.uoa.di.monitoring.android.C.LOG_FILE;
-import static gr.uoa.di.monitoring.android.C.WARN;
 import static gr.uoa.di.monitoring.android.C.ac_cancel_alarm;
 import static gr.uoa.di.monitoring.android.C.ac_setup_alarm;
 
-public abstract class Monitor extends WakefulIntentService {
+public abstract class Monitor extends WakefulIntentService implements Logging {
 
 	private final String tag_ = this.getClass().getSimpleName();
 	private static final String TAG = Monitor.class.getSimpleName();
@@ -106,11 +103,9 @@ public abstract class Monitor extends WakefulIntentService {
 	abstract void cleanup();
 
 	/**
-	 * Enforces monitors to persists their data
+	 * Enforces monitors to persist their data
 	 *
 	 * @param <T>
-	 *
-	 * @return the prefix used by the file where the data is persisted
 	 */
 	abstract <T> void saveResults(T data);
 
@@ -218,7 +213,7 @@ public abstract class Monitor extends WakefulIntentService {
 	}
 
 	File dataFileInInternalStorage() throws IOException {
-		File internalDir = FileIO.createDirInternal(this, sImei);
+		File internalDir = FileIO.createDirInternal(this, sRootFolder);
 		return new File(internalDir, fileName());
 	}
 
@@ -250,37 +245,20 @@ public abstract class Monitor extends WakefulIntentService {
 	// =========================================================================
 	// LOGGING
 	// =========================================================================
-	void w(String msg) {
-		if (!WARN) return;
-		Log.w(tag_, msg); // why I do not use w() is left as an exercise
-		if (!DEBUG) return;
-		try {
-			File outputFile = FileIO.fileExternalApplicationStorage(this,
-				sRootFolder, fileName());
-			FileIO.append(outputFile, msg + "\n", CHARSET_NAME);
-			outputFile = FileIO.fileExternalTopLevel(LOG_DIR, LOG_FILE, null);
-			FileIO.append(outputFile, msg + "\n", CHARSET_NAME);
-		} catch (FileNotFoundException e) {
-			Log.w(tag_, e.getMessage());
-		} catch (IOException e) {
-			Log.w(tag_, e.getMessage());
-		}
+	@Override
+	public void w(String msg) {
+		C.w(tag_, msg);
+
 	}
 
-	void w(String msg, Throwable t) {
-		if (WARN) Log.w(tag_, msg, t);
+	@Override
+	public void d(String msg) {
+		C.d(tag_, msg);
 	}
 
-	void w(Throwable t) {
-		if (WARN) Log.w(tag_, t);
-	}
-
-	void d(String msg) {
-		if (DEBUG) Log.d(tag_, msg);
-	}
-
-	void i(String msg) {
-		if (INFO) Log.i(tag_, msg);
+	@Override
+	public void v(String msg) {
+		C.v(tag_, msg);
 	}
 }
 

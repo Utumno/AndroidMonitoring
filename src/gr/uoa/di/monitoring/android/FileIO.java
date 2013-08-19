@@ -176,6 +176,7 @@ public final class FileIO {
 						OUTPUT_BUFFER_SIZE);
 				// FIXME writes them all ?
 				buffer.write(bytes);
+				Log.w("file io ", file.getAbsolutePath());
 				// You do typically need to flush the decorator in the
 				// non-exception case - see :
 				// http://stackoverflow.com/a/2732760/281545
@@ -375,7 +376,7 @@ public final class FileIO {
 	 *             if the external storage is unavailable or the dir can't be
 	 *             created
 	 */
-	public static File fileExternalTopLevel(final String rootDir,
+	public static File fileExternalPublicStorage(final String rootDir,
 			final String filename, final String dirInPublicStorage)
 			throws IOException {
 		// create a File object for the parent directory

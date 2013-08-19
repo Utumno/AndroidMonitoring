@@ -8,6 +8,11 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.support.v4.app.NotificationCompat;
+import android.util.Log;
+
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.IOException;
 
 /**
  * Application wide Constants
@@ -63,6 +68,7 @@ public final class C {
 	public static final int NOT_USED = 0;
 	public static final String LOG_DIR = "";
 	public static final String LOG_FILE = "LOG.log";
+	private static final String LOG_CHARSET_NAME = UTF8;
 
 	// TODO : docs/test
 	public static Intent launchSettingsIntent(final String action) {
@@ -111,5 +117,35 @@ public final class C {
 		NotificationManager notificationManager = (NotificationManager) context
 				.getSystemService(Context.NOTIFICATION_SERVICE);
 		notificationManager.notify(tag, id, not);
+	}
+
+	// =========================================================================
+	// LOGGING
+	// =========================================================================
+	public static void w(String tag, String msg) {
+		if (!WARN) return;
+		Log.w(tag, msg);
+		if (!DEBUG) return;
+		try {
+			// File outputFile = FileIO.fileExternalApplicationStorage(this,
+			// sRootFolder, fileName());
+			// FileIO.append(outputFile, msg + "\n", LOG_CHARSET_NAME);
+			File outputFile = FileIO.fileExternalPublicStorage(LOG_DIR,
+				LOG_FILE,
+				null);
+			FileIO.append(outputFile, msg + "\n", LOG_CHARSET_NAME);
+		} catch (FileNotFoundException e) {
+			Log.w(tag, e.getMessage());
+		} catch (IOException e) {
+			Log.w(tag, e.getMessage());
+		}
+	}
+
+	public static void d(String tag, String msg) {
+		if (DEBUG) Log.d(tag, msg);
+	}
+
+	public static void v(String tag, String msg) {
+		if (VERBOSE) Log.v(tag, msg);
 	}
 }
