@@ -3,7 +3,6 @@ package gr.uoa.di.monitoring.android.services;
 import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
-import android.os.Environment;
 import android.telephony.TelephonyManager;
 import android.util.Log;
 
@@ -12,10 +11,14 @@ import com.commonsware.cwac.wakeful.WakefulIntentService;
 import gr.uoa.di.monitoring.android.AccessPreferences;
 import gr.uoa.di.monitoring.android.FileIO;
 import gr.uoa.di.monitoring.android.R;
+import gr.uoa.di.monitoring.android.persist.FileStore;
+import gr.uoa.di.monitoring.android.persist.FileStore.Fields;
 import gr.uoa.di.monitoring.android.receivers.BaseMonitoringReceiver;
 import gr.uoa.di.monitoring.android.receivers.BaseReceiver;
+import gr.uoa.di.monitoring.android.receivers.BatteryMonitoringReceiver;
 import gr.uoa.di.monitoring.android.receivers.LocationMonitoringReceiver;
 import gr.uoa.di.monitoring.android.receivers.TriggerMonitoringBootReceiver;
+import gr.uoa.di.monitoring.android.receivers.WifiMonitoringReceiver;
 
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -27,6 +30,9 @@ import java.util.List;
 import static gr.uoa.di.monitoring.android.C.DEBUG;
 import static gr.uoa.di.monitoring.android.C.DISABLE;
 import static gr.uoa.di.monitoring.android.C.INFO;
+import static gr.uoa.di.monitoring.android.C.ISO8859;
+import static gr.uoa.di.monitoring.android.C.LOG_DIR;
+import static gr.uoa.di.monitoring.android.C.LOG_FILE;
 import static gr.uoa.di.monitoring.android.C.WARN;
 import static gr.uoa.di.monitoring.android.C.ac_cancel_alarm;
 import static gr.uoa.di.monitoring.android.C.ac_setup_alarm;
@@ -35,20 +41,25 @@ public abstract class Monitor extends WakefulIntentService {
 
 	private final String tag_ = this.getClass().getSimpleName();
 	private static final String TAG = Monitor.class.getSimpleName();
+	// Persistence
 	/**
-	 * The name of the charset to use when writing to files - ASCII for space
+	 * The name of the charset to use when writing to files - ISO-8859-1 for
+	 * space and byte preservation
 	 */
-	private static final String CHARSET_NAME = "ASCII";
+	static final String CHARSET_NAME = ISO8859;
 	private static final String NO_IMEI = "NO_IMEI";
 	private static String sImei;
+	private static String sRootFolder;
+	// Monitoring
 	private static final int INITIAL_DELAY = 5000; // 5 seconds
 	private static final List<Class<? extends BaseReceiver>> RECEIVERS = new ArrayList<Class<? extends BaseReceiver>>();
 	private static final List<Class<? extends BaseMonitoringReceiver>> SETUP_ALARM_RECEIVERS = new ArrayList<Class<? extends BaseMonitoringReceiver>>();
 	// subclasses fields - subclasses are final so those have default scope
-	static final String DELIMITER = "::";
+	/** Delimiter used to separate the items in debug prints */
+	static final String DEBUG_DELIMITER = "::";
 	static {
-		// SETUP_ALARM_RECEIVERS.add(BatteryMonitoringReceiver.class);
-		// SETUP_ALARM_RECEIVERS.add(WifiMonitoringReceiver.class);
+		SETUP_ALARM_RECEIVERS.add(BatteryMonitoringReceiver.class);
+		SETUP_ALARM_RECEIVERS.add(WifiMonitoringReceiver.class);
 		SETUP_ALARM_RECEIVERS.add(LocationMonitoringReceiver.class);
 		RECEIVERS.addAll(SETUP_ALARM_RECEIVERS);
 		RECEIVERS.add(TriggerMonitoringBootReceiver.class);
@@ -63,7 +74,7 @@ public abstract class Monitor extends WakefulIntentService {
 		super.onCreate();
 		try {
 			if (sImei == null) {
-				final Context applicationContext = this.getApplicationContext();
+				final Context applicationContext = getApplicationContext();
 				TelephonyManager tm = (TelephonyManager) applicationContext
 						.getSystemService(Context.TELEPHONY_SERVICE);
 				sImei = tm.getDeviceId();
@@ -72,9 +83,21 @@ public abstract class Monitor extends WakefulIntentService {
 			w("No imei today : " + e);
 			sImei = NO_IMEI;
 		}
+		sRootFolder = sImei; // have to do it here
 	}
 
+	// =========================================================================
+	// Abstract methods
+	// =========================================================================
 	public abstract long getInterval();
+
+	/**
+	 * Enforces monitors to return a prefix prepended to the filename where the
+	 * data is persisted. This way the various files are differentiated
+	 *
+	 * @return the prefix used by the file where the data is persisted
+	 */
+	public abstract String logPrefix();
 
 	/**
 	 * Enforces Monitors to define cleanup actions to be performed when
@@ -82,6 +105,18 @@ public abstract class Monitor extends WakefulIntentService {
 	 */
 	abstract void cleanup();
 
+	/**
+	 * Enforces monitors to persists their data
+	 *
+	 * @param <T>
+	 *
+	 * @return the prefix used by the file where the data is persisted
+	 */
+	abstract <T> void saveResults(T data);
+
+	// =========================================================================
+	// API
+	// =========================================================================
 	public static int getInitialDelay() {
 		return INITIAL_DELAY;
 	}
@@ -118,6 +153,52 @@ public abstract class Monitor extends WakefulIntentService {
 	// =========================================================================
 	// methods used by the subclasses
 	// =========================================================================
+	<T extends Enum<T> & Fields> void saveData(List<byte[]> listByteArrays,
+			List<List<byte[]>> listOfListsOfByteArrays, Class<T> fields) {
+		try {
+			// if (DEBUG) {
+			// // write in external storage so I can see what goes
+			// // on
+			// File file = FileIO.fileExternalTopLevel(LOG_DIR, fileName(),
+			// null);
+			// FileStore.persist(file, fields, listByteArrays,
+			// listOfListsOfByteArrays);
+			// }
+			// internal storage
+			FileStore.persist(dataFileInInternalStorage(), fields,
+				listByteArrays, listOfListsOfByteArrays);
+		} catch (FileNotFoundException e) {
+			// TODO abort ?
+			w("IO exception writing data :" + e.getMessage());
+		} catch (IOException e) {
+			// TODO abort ?
+			w("IO exception writing data :" + e.getMessage());
+		}
+	}
+
+	void saveData(List<byte[]> listByteArrays) {
+		try {
+			// if (DEBUG) {
+			// // write in external storage so I can see what goes
+			// // on
+			// File file = FileIO.fileExternalTopLevel(LOG_DIR, fileName(),
+			// null);
+			// // w("FileIO.fileExternalTopLevel : " + file.getAbsolutePath());
+			// FileStore.persist(file, listByteArrays);
+			// }
+			// internal storage
+			// w("dataFileInInternalStorage() : " +
+			// dataFileInInternalStorage());
+			FileStore.persist(dataFileInInternalStorage(), listByteArrays);
+		} catch (FileNotFoundException e) {
+			// TODO abort ?
+			w("IO exception writing data :" + e.getMessage());
+		} catch (IOException e) {
+			// TODO abort ?
+			w("IO exception writing data :" + e.getMessage());
+		}
+	}
+
 	<T> void persist(String key, T value) {
 		AccessPreferences.persist(this, key, value);
 	}
@@ -136,21 +217,34 @@ public abstract class Monitor extends WakefulIntentService {
 		}
 	}
 
+	File dataFileInInternalStorage() throws IOException {
+		File internalDir = FileIO.createDirInternal(this, sImei);
+		return new File(internalDir, fileName());
+	}
+
 	/**
-	 * All monitoring info is required to provide a timestamp and the IMEI -
-	 * this method takes care of that
+	 * Debug header containing the time in human readable format - uses
+	 * DEBUG_DELIMITER
 	 *
 	 * @return a StringBuilder containing the common info
 	 */
-	StringBuilder monitorInfoHeader() {
+	StringBuilder debugHeader() {
 		StringBuilder sb = new StringBuilder();
-		// sb.append(sImei);
-		// sb.append(DELIMITER);
-		// TODO time...
 		// sb.append(System.currentTimeMillis() / 1000);
 		sb.append(new Date(System.currentTimeMillis()));
-		sb.append(DELIMITER);
+		sb.append(DEBUG_DELIMITER);
 		return sb;
+	}
+
+	/**
+	 * Creates the filename of the file the data is persisted. For the moment
+	 * the filename is the string returned by {@code filePrefix()} but TODO :
+	 * add a preferences-persisted mechanism to break the files via timestamp
+	 *
+	 * @return
+	 */
+	String fileName() {
+		return logPrefix();
 	}
 
 	// =========================================================================
@@ -158,31 +252,18 @@ public abstract class Monitor extends WakefulIntentService {
 	// =========================================================================
 	void w(String msg) {
 		if (!WARN) return;
-		Log.w(tag_, msg);
+		Log.w(tag_, msg); // why I do not use w() is left as an exercise
+		if (!DEBUG) return;
 		try {
-			// create a File object for the parent directory
-			final boolean externalStoragePresent = FileIO
-					.isExternalStoragePresent();
-			// d("External : " + externalStoragePresent);
-			if (externalStoragePresent) {
-				File logdir = new File(Environment
-						.getExternalStoragePublicDirectory(
-							Environment.DIRECTORY_DOWNLOADS).getAbsolutePath());
-				// have the object build the directory structure, if needed.
-				if (FileIO.createDirExternal(logdir)) {
-					// create a File object for the output file
-					File outputFile = new File(logdir, "LOG.log");
-					FileIO.append(outputFile, msg + "\n", CHARSET_NAME);
-				} else {
-					w("can't create output directory");
-				}
-			} // else
-				// FileIO.append("LOG.log", msg + "\n", this, CHARSET_NAME,
-				// Context.MODE_PRIVATE);
+			File outputFile = FileIO.fileExternalApplicationStorage(this,
+				sRootFolder, fileName());
+			FileIO.append(outputFile, msg + "\n", CHARSET_NAME);
+			outputFile = FileIO.fileExternalTopLevel(LOG_DIR, LOG_FILE, null);
+			FileIO.append(outputFile, msg + "\n", CHARSET_NAME);
 		} catch (FileNotFoundException e) {
-			Log.w(tag_, e + "");
+			Log.w(tag_, e.getMessage());
 		} catch (IOException e) {
-			Log.w(tag_, e + "");
+			Log.w(tag_, e.getMessage());
 		}
 	}
 

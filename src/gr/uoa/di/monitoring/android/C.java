@@ -16,6 +16,22 @@ import android.support.v4.app.NotificationCompat;
  */
 public final class C {
 
+	// Standard charsets' NAMES
+	// Seven-bit ASCII, a.k.a. ISO646-US, a.k.a. the Basic Latin block of the
+	// Unicode character set
+	public static final String ASCII = "US-ASCII";
+	// ISO Latin Alphabet No. 1, a.k.a. ISO-LATIN-1
+	public static final String ISO8859 = "ISO-8859-1";
+	// Eight-bit UCS Transformation Format
+	public static final String UTF8 = "UTF-8";
+	// Sixteen-bit UCS Transformation Format, big-endian byte order
+	public static final String UTF16BE = "UTF-16BE";
+	// Sixteen-bit UCS Transformation Format, little-endian byte order
+	public static final String UTF16LE = "UTF-16LE";
+	// Sixteen-bit UCS Transformation Format, byte order identified by an
+	// optional byte-order mark
+	public static final String UTF16 = "UTF-16";
+	// / Standard charsets' NAMES
 	public static final String APP_PACKAGE_NAME = C.class.getPackage()
 			.toString().split(" ")[1];
 	public static final int UNDEFINED = -1;
@@ -45,6 +61,8 @@ public final class C {
 	public static final boolean WARN = true;
 	public static final boolean ERROR = true;
 	public static final int NOT_USED = 0;
+	public static final String LOG_DIR = "";
+	public static final String LOG_FILE = "LOG.log";
 
 	// TODO : docs/test
 	public static Intent launchSettingsIntent(final String action) {

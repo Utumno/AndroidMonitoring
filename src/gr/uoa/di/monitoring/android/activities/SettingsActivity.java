@@ -95,6 +95,13 @@ public class SettingsActivity extends PreferenceActivity {
 		// FIXME unregister ????
 	}
 
+	@Override
+	protected void onRestart() {
+		super.onRestart();
+		setPreferenceScreen(null);
+		setupSimplePreferencesScreen();
+	}
+
 	/**
 	 * Shows the simplified settings UI if the device configuration if the
 	 * device configuration dictates that a simplified, single-pane UI should be

@@ -12,11 +12,17 @@ import android.os.Bundle;
 import android.provider.Settings;
 
 import gr.uoa.di.monitoring.android.activities.DialogActivity;
+import gr.uoa.di.monitoring.android.persist.FileStore;
 import gr.uoa.di.monitoring.android.receivers.BaseReceiver;
 import gr.uoa.di.monitoring.android.receivers.LocationReceiver;
 
-import java.util.Arrays;
+import org.apache.http.util.EncodingUtils;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+
+import static gr.uoa.di.monitoring.android.C.DEBUG;
 import static gr.uoa.di.monitoring.android.C.DISABLE;
 import static gr.uoa.di.monitoring.android.C.ENABLE;
 import static gr.uoa.di.monitoring.android.C.NOT_USED;
@@ -27,6 +33,7 @@ import static gr.uoa.di.monitoring.android.C.triggerNotification;
 
 public final class LocationMonitor extends Monitor {
 
+	private static final String LOG_PREFIX = "loc";
 	private static final long LOCATION_MONITORING_INTERVAL = 2 * 60 * 1000;
 	private static final Class<? extends BaseReceiver> PERSONAL_RECEIVER = LocationReceiver.class;
 	// Location api calls constants
@@ -66,7 +73,7 @@ public final class LocationMonitor extends Monitor {
 
 	@Override
 	protected void doWakefulWork(Intent intent) {
-		final StringBuilder sb = monitorInfoHeader();
+		final StringBuilder sb = debugHeader();
 		final CharSequence action = intent.getAction();
 		if (action == null) {
 			// monitor command from the alarm manager
@@ -96,12 +103,13 @@ public final class LocationMonitor extends Monitor {
 				if (loc == null) {
 					w(sb + "NULL LOCATION  - EXTRAS : " + extras);
 				} else {
-					final String provider = loc.getProvider();
-					sb.append(" (" + provider + ") ");
-					final double lon = loc.getLongitude();
-					final double lat = loc.getLatitude();
-					final long time = loc.getTime();
-					w(sb + "latitude :" + lat + " -- longitude : " + lon);
+					if (DEBUG) {
+						final String provider = loc.getProvider();
+						sb.append(" (" + provider + ") ");
+						final double lon = loc.getLongitude();
+						final double lat = loc.getLatitude();
+						w(sb + "latitude :" + lat + " -- longitude : " + lon);
+					}
 					d("Got location - disabling LocationReceiver");
 					receiver(DISABLE);
 					d("Got location - removing updates");
@@ -111,12 +119,73 @@ public final class LocationMonitor extends Monitor {
 					// updates for the same pending intent pi ?
 					// maybe I'll screw up my next update request ?
 					lm().removeUpdates(pi);
+					// persist
+					saveResults(loc);
 				}
 			} else {
 				w(sb + "NULL EXTRAS");
 			}
 		} else if (ac_aborting.equals(action)) {
 			cleanup();
+		}
+	}
+
+	private static enum LocationFields implements FileStore.Fields {
+		TIME {
+
+			@Override
+			public <T> List<byte[]> getData(T data) {
+				Location loc = (Location) data;
+				List<byte[]> arrayList = new ArrayList<byte[]>();
+				arrayList.add(EncodingUtils.getAsciiBytes(loc.getTime() + ""));
+				return arrayList;
+			}
+		},
+		LAT {
+
+			@Override
+			public <T> List<byte[]> getData(T data) {
+				Location loc = (Location) data;
+				List<byte[]> arrayList = new ArrayList<byte[]>();
+				arrayList.add(EncodingUtils.getAsciiBytes(loc.getLatitude()
+					+ ""));
+				return arrayList;
+			}
+		},
+		LONG {
+
+			@Override
+			public <T> List<byte[]> getData(T data) {
+				Location loc = (Location) data;
+				List<byte[]> arrayList = new ArrayList<byte[]>();
+				arrayList.add(EncodingUtils.getAsciiBytes(loc.getLongitude()
+					+ ""));
+				return arrayList;
+			}
+		},
+		PROVIDER {
+
+			@Override
+			public <T> List<byte[]> getData(T data) {
+				Location loc = (Location) data;
+				List<byte[]> arrayList = new ArrayList<byte[]>();
+				arrayList.add(EncodingUtils.getAsciiBytes(loc.getProvider()
+					+ ""));
+				return arrayList;
+			}
+		};
+
+		@Override
+		public boolean isList() {
+			return false; // no lists here
+		}
+
+		public static <T> List<byte[]> createListOfByteArrays(T data) {
+			final List<byte[]> listByteArrays = new ArrayList<byte[]>();
+			for (LocationFields bs : LocationFields.values()) {
+				listByteArrays.add(bs.getData(data).get(0));
+			}
+			return listByteArrays;
 		}
 	}
 
@@ -317,5 +386,17 @@ public final class LocationMonitor extends Monitor {
 	@Override
 	public long getInterval() {
 		return LOCATION_MONITORING_INTERVAL;
+	}
+
+	@Override
+	public String logPrefix() {
+		return LOG_PREFIX;
+	}
+
+	@Override
+	public <T> void saveResults(T data) {
+		List<byte[]> listByteArrays = LocationFields
+				.createListOfByteArrays(data);
+		saveData(listByteArrays);
 	}
 }

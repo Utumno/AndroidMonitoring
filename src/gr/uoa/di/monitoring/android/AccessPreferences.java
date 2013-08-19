@@ -53,7 +53,7 @@ public final class AccessPreferences {
 		else if (value instanceof Float) ed.putFloat(key, (Float) value);
 		else if (value instanceof Set) {
 			if (android.os.Build.VERSION.SDK_INT < Build.VERSION_CODES.HONEYCOMB) {
-				throw new IllegalStateException(
+				throw new IllegalArgumentException(
 						"You can add sets in the preferences only after API "
 							+ Build.VERSION_CODES.HONEYCOMB);
 			}
@@ -68,8 +68,7 @@ public final class AccessPreferences {
 			// }
 			// }
 			@SuppressWarnings({ "unchecked", "unused" })
-			Editor soIcanAddSuppress = ed
-					.putStringSet(key, (Set<String>) value);
+			Editor dummyVariable = ed.putStringSet(key, (Set<String>) value);
 		} else throw new IllegalArgumentException("The given value : " + value
 			+ " cannot be persisted");
 		ed.commit();
@@ -101,7 +100,7 @@ public final class AccessPreferences {
 			// int i = p.getInt(KEY_FOR_STRING, 7);
 			// results in a class cast exception as well !
 			final Class<?> clazz = value.getClass();
-			// TODO : IS THE ORDER OF FLOAT, INTEGER AND LONG CORRECT ?
+			// TODO : IS THE ORDER OF FLOAT, INTEGER AND LONG CORRECT in CLASSES
 			for (Class<?> cls : CLASSES) {
 				if (clazz.isAssignableFrom(cls)) {
 					try {
@@ -140,7 +139,7 @@ public final class AccessPreferences {
 				.getFloat(key, (Float) defaultValue);
 		else if (defaultValue instanceof Set) {
 			if (android.os.Build.VERSION.SDK_INT < Build.VERSION_CODES.HONEYCOMB) {
-				throw new IllegalStateException(
+				throw new IllegalArgumentException(
 						"You can add sets in the preferences only after API "
 							+ Build.VERSION_CODES.HONEYCOMB);
 			}

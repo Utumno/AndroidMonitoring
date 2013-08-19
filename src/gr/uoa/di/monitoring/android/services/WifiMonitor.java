@@ -13,9 +13,13 @@ import android.util.Log;
 import com.commonsware.cwac.wakeful.WakefulIntentService;
 
 import gr.uoa.di.monitoring.android.AccessPreferences;
+import gr.uoa.di.monitoring.android.persist.FileStore;
 import gr.uoa.di.monitoring.android.receivers.BaseReceiver;
 import gr.uoa.di.monitoring.android.receivers.ScanResultsReceiver;
 
+import org.apache.http.util.EncodingUtils;
+
+import java.util.ArrayList;
 import java.util.List;
 
 import static gr.uoa.di.monitoring.android.C.APP_PACKAGE_NAME;
@@ -30,6 +34,7 @@ import static gr.uoa.di.monitoring.android.C.triggerNotification;
 
 public final class WifiMonitor extends Monitor {
 
+	private static final String LOG_PREFIX = "wifi";
 	// TODO : timeout wait()
 	private static final long WIFI_MONITORING_INTERVAL = 1 * 60 * 1000;
 	private static final Class<? extends BaseReceiver> PERSONAL_RECEIVER = ScanResultsReceiver.class;
@@ -67,7 +72,7 @@ public final class WifiMonitor extends Monitor {
 
 	@Override
 	protected void doWakefulWork(Intent in) {
-		StringBuilder sb = monitorInfoHeader();
+		StringBuilder sb = debugHeader();
 		final CharSequence action = in.getAction();
 		try {
 			initServices(this);
@@ -120,6 +125,7 @@ public final class WifiMonitor extends Monitor {
 			synchronized (Gatekeeper.WIFI_MONITOR) {
 				if (done) {
 					warnScanResults(sb);
+					saveResults(wm.getScanResults());
 					disableWifiIfIhadItEnableMyself();
 					d("Releasing wake lock for the scan");
 					releaseWifiLock();
@@ -295,9 +301,9 @@ public final class WifiMonitor extends Monitor {
 				// TODO : do I have to report it ?
 			} else {
 				for (ScanResult scanResult : scanRes) {
-					sb.append(scanResult.SSID + DELIMITER);
-					// sb.append(scanResult.BSSID + DELIMITER);
-					// sb.append(scanResult.level + DELIMITER);
+					sb.append(scanResult.SSID + DEBUG_DELIMITER);
+					// sb.append(scanResult.BSSID + DEBUG_DELIMITER);
+					// sb.append(scanResult.level + DEBUG_DELIMITER);
 				}
 				w(sb.toString());
 			}
@@ -368,5 +374,118 @@ public final class WifiMonitor extends Monitor {
 			}
 			throw new IllegalStateException("Forgotten enum constant");
 		}
+	}
+
+	private static enum WifiFields implements FileStore.Fields {
+		TIME(false) {
+
+			@Override
+			public <T> List<byte[]> getData(T data) {
+				// TODO time()
+				List<byte[]> arrayList = new ArrayList<byte[]>();
+				arrayList.add(EncodingUtils.getAsciiBytes(System
+						.currentTimeMillis() + ""));
+				return arrayList;
+			}
+		},
+		SSID(true) {
+
+			@Override
+			public <T> List<byte[]> getData(T data) {
+				List<ScanResult> scanRes = (List<ScanResult>) data;
+				List<byte[]> arrayList = new ArrayList<byte[]>();
+				if (scanRes != null) {
+					for (ScanResult loc : scanRes) {
+						arrayList.add(EncodingUtils.getAsciiBytes(loc.SSID));
+					}
+				}
+				return arrayList;
+			}
+		},
+		BSSID(true) {
+
+			@Override
+			public <T> List<byte[]> getData(T data) {
+				List<ScanResult> scanRes = (List<ScanResult>) data;
+				List<byte[]> arrayList = new ArrayList<byte[]>();
+				if (scanRes != null) {
+					for (ScanResult loc : scanRes) {
+						arrayList.add(EncodingUtils.getAsciiBytes(loc.BSSID));
+					}
+				}
+				return arrayList;
+			}
+		},
+		FREQUENCY(true) {
+
+			@Override
+			public <T> List<byte[]> getData(T data) {
+				List<ScanResult> scanRes = (List<ScanResult>) data;
+				List<byte[]> arrayList = new ArrayList<byte[]>();
+				if (scanRes != null) {
+					for (ScanResult loc : scanRes) {
+						arrayList.add(EncodingUtils.getAsciiBytes(loc.frequency
+							+ ""));
+					}
+				}
+				return arrayList;
+			}
+		},
+		LEVEL(true) {
+
+			@Override
+			public <T> List<byte[]> getData(T data) {
+				List<ScanResult> scanRes = (List<ScanResult>) data;
+				List<byte[]> arrayList = new ArrayList<byte[]>();
+				if (scanRes != null) {
+					for (ScanResult loc : scanRes) {
+						arrayList.add(EncodingUtils.getAsciiBytes(loc.level
+							+ ""));
+					}
+				}
+				return arrayList;
+			}
+		};
+
+		private boolean isList;
+
+		private WifiFields(boolean isList) {
+			this.isList = isList;
+		}
+
+		@Override
+		public boolean isList() {
+			return isList;
+		}
+
+		public static <T> List<byte[]> createListOfByteArrays(T data) {
+			final List<byte[]> listByteArrays = new ArrayList<byte[]>();
+			for (WifiFields bs : WifiFields.values()) {
+				if (!bs.isList()) listByteArrays.add(bs.getData(data).get(0));
+			}
+			return listByteArrays;
+		}
+
+		public static <T> List<List<byte[]>> createListOfListsOfByteArrays(
+				T data) {
+			final List<List<byte[]>> listofListsOfByteArrays = new ArrayList<List<byte[]>>();
+			for (WifiFields bs : WifiFields.values()) {
+				if (bs.isList()) listofListsOfByteArrays.add(bs.getData(data));
+			}
+			return listofListsOfByteArrays;
+		}
+	}
+
+	@Override
+	public String logPrefix() {
+		return LOG_PREFIX;
+	}
+
+	@Override
+	<T> void saveResults(T data) {
+		List<byte[]> listByteArrays = WifiFields.createListOfByteArrays(data);
+		List<List<byte[]>> listOfListsOfByteArrays = WifiFields
+				.createListOfListsOfByteArrays(data);
+		saveData(listByteArrays, listOfListsOfByteArrays, WifiFields.class);
 	}
 }

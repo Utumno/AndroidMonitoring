@@ -4,14 +4,7 @@ import android.content.BroadcastReceiver;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.pm.PackageManager;
-import android.os.Environment;
 import android.util.Log;
-
-import gr.uoa.di.monitoring.android.FileIO;
-
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.IOException;
 
 import static gr.uoa.di.monitoring.android.C.DEBUG;
 import static gr.uoa.di.monitoring.android.C.VERBOSE;
@@ -58,30 +51,17 @@ public abstract class BaseReceiver extends BroadcastReceiver {
 	// =========================================================================
 	void w(String msg) {
 		if (!WARN) return;
-		Log.w(tag_, msg);
-		try {
-			// create a File object for the parent directory
-			final boolean externalStoragePresent = FileIO
-					.isExternalStoragePresent();
-			// d("External : " + externalStoragePresent);
-			if (externalStoragePresent) {
-				File logdir = new File(Environment
-						.getExternalStoragePublicDirectory(
-							Environment.DIRECTORY_DOWNLOADS).getAbsolutePath());
-				// have the object build the directory structure, if needed.
-				if (FileIO.createDirExternal(logdir)) {
-					// create a File object for the output file
-					File outputFile = new File(logdir, "LOG.log");
-					FileIO.append(outputFile, msg + "\n", CHARSET_NAME);
-				} else {
-					w("can't create output directory");
-				}
-			}
-		} catch (FileNotFoundException e) {
-			Log.w(tag_, e + "");
-		} catch (IOException e) {
-			Log.w(tag_, e + "");
-		}
+		Log.w(tag_, msg); // why I do not use w() is left as an exercise
+		if (!DEBUG) return;
+		// try {
+		// File outputFile = FileIO.fileExternalTopLevel(LOG_DIR, LOG_FILE,
+		// null);
+		// FileIO.append(outputFile, msg + "\n", CHARSET_NAME);
+		// } catch (FileNotFoundException e) {
+		// Log.w(tag_, e);
+		// } catch (IOException e) {
+		// Log.w(tag_, e);
+		// }
 	}
 
 	void d(String msg) {
