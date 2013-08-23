@@ -1,6 +1,6 @@
 package gr.uoa.di.monitoring.android.persist;
 
-import gr.uoa.di.monitoring.android.FileIO;
+import gr.uoa.di.android.helpers.FileIO;
 
 import java.io.File;
 import java.io.FileNotFoundException;

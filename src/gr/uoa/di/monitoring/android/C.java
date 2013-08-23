@@ -10,6 +10,8 @@ import android.content.Intent;
 import android.support.v4.app.NotificationCompat;
 import android.util.Log;
 
+import gr.uoa.di.android.helpers.FileIO;
+
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;

@@ -8,9 +8,9 @@ import android.util.Log;
 
 import com.commonsware.cwac.wakeful.WakefulIntentService;
 
+import gr.uoa.di.android.helpers.FileIO;
 import gr.uoa.di.monitoring.android.AccessPreferences;
 import gr.uoa.di.monitoring.android.C;
-import gr.uoa.di.monitoring.android.FileIO;
 import gr.uoa.di.monitoring.android.Logging;
 import gr.uoa.di.monitoring.android.R;
 import gr.uoa.di.monitoring.android.persist.FileStore;
