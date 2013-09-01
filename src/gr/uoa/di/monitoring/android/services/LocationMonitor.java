@@ -12,13 +12,10 @@ import android.os.Bundle;
 import android.provider.Settings;
 
 import gr.uoa.di.monitoring.android.activities.DialogActivity;
-import gr.uoa.di.monitoring.android.persist.FileStore;
 import gr.uoa.di.monitoring.android.receivers.BaseReceiver;
 import gr.uoa.di.monitoring.android.receivers.LocationReceiver;
+import gr.uoa.di.monitoring.model.Position;
 
-import org.apache.http.util.EncodingUtils;
-
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
@@ -127,65 +124,6 @@ public final class LocationMonitor extends Monitor {
 			}
 		} else if (ac_aborting.equals(action)) {
 			cleanup();
-		}
-	}
-
-	private static enum LocationFields implements FileStore.Fields {
-		TIME {
-
-			@Override
-			public <T> List<byte[]> getData(T data) {
-				Location loc = (Location) data;
-				List<byte[]> arrayList = new ArrayList<byte[]>();
-				arrayList.add(EncodingUtils.getAsciiBytes(loc.getTime() + ""));
-				return arrayList;
-			}
-		},
-		LAT {
-
-			@Override
-			public <T> List<byte[]> getData(T data) {
-				Location loc = (Location) data;
-				List<byte[]> arrayList = new ArrayList<byte[]>();
-				arrayList.add(EncodingUtils.getAsciiBytes(loc.getLatitude()
-					+ ""));
-				return arrayList;
-			}
-		},
-		LONG {
-
-			@Override
-			public <T> List<byte[]> getData(T data) {
-				Location loc = (Location) data;
-				List<byte[]> arrayList = new ArrayList<byte[]>();
-				arrayList.add(EncodingUtils.getAsciiBytes(loc.getLongitude()
-					+ ""));
-				return arrayList;
-			}
-		},
-		PROVIDER {
-
-			@Override
-			public <T> List<byte[]> getData(T data) {
-				Location loc = (Location) data;
-				List<byte[]> arrayList = new ArrayList<byte[]>();
-				arrayList.add(EncodingUtils.getAsciiBytes(loc.getProvider()
-					+ ""));
-				return arrayList;
-			}
-		};
-
-		@Override
-		public boolean isList() {
-			return false; // no lists here
-		}
-
-		public static <T> List<byte[]> createListOfByteArrays(T data) {
-			final List<byte[]> listByteArrays = new ArrayList<byte[]>();
-			for (LocationFields bs : LocationFields.values()) {
-				listByteArrays.add(bs.getData(data).get(0));
-			}
-			return listByteArrays;
 		}
 	}
 
@@ -395,7 +333,7 @@ public final class LocationMonitor extends Monitor {
 
 	@Override
 	public <T> void saveResults(T data) {
-		List<byte[]> listByteArrays = LocationFields
+		List<byte[]> listByteArrays = Position.LocationFields
 				.createListOfByteArrays(data);
 		saveData(listByteArrays);
 	}

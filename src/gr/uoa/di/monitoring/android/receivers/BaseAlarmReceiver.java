@@ -9,6 +9,7 @@ import android.os.SystemClock;
 
 import com.commonsware.cwac.wakeful.WakefulIntentService;
 
+import gr.uoa.di.monitoring.android.services.AlarmService;
 import gr.uoa.di.monitoring.android.services.Monitor;
 
 import static gr.uoa.di.monitoring.android.C.ac_aborting;
@@ -17,21 +18,22 @@ import static gr.uoa.di.monitoring.android.C.ac_monitor;
 import static gr.uoa.di.monitoring.android.C.ac_setup_alarm;
 
 /**
- * Base class for all Monitoring Receivers. Responsible for registering the
- * alarms (on Broadcast from boot receiver or activity) , canceling the alarms
- * (on Broadcast from activity) and launching the (Wakeful) IntentServices on
- * receiving the Alarm Manager's Broadcast. Subclasses are used to provide the
- * particular Wakeful services (by defining the abstract getService()) but the
- * common code is in this class's onReceive() which is *final*
+ * Base class for all Alarm Receivers. Responsible for registering the alarms
+ * (on Broadcast from boot receiver or activity), canceling the alarms (on
+ * Broadcast from activity or on abort) and launching the (Wakeful)
+ * IntentServices on receiving the Alarm Manager's Broadcast. Subclasses are
+ * used to provide the particular Wakeful services (by defining the abstract
+ * getService()) but the common code is in this class's onReceive() which is
+ * *final*
  *
  * @author MrD
  */
-public abstract class BaseMonitoringReceiver extends BaseReceiver {
+public abstract class BaseAlarmReceiver extends BaseReceiver {
 
-	protected static final String RECEIVERS_PACKAGE_NAME = BaseMonitoringReceiver.class
+	protected static final String RECEIVERS_PACKAGE_NAME = BaseAlarmReceiver.class
 			.getPackage().toString().split(" ")[1];
 	/** Defined by subclasses */
-	private final Class<? extends Monitor> monitor_class_ = getService();
+	private final Class<? extends AlarmService> monitor_class_ = getService();
 	// could be in method setupAlarm() ??? or not ?
 	private Intent monitoringIntent;
 	// could be in method setupAlarm()
@@ -59,7 +61,6 @@ public abstract class BaseMonitoringReceiver extends BaseReceiver {
 			WakefulIntentService.sendWakefulWork(context, monitor_class_);
 		} else {
 			w("Received bogus intent : " + intent);
-			return;
 		}
 	}
 
@@ -87,6 +88,6 @@ public abstract class BaseMonitoringReceiver extends BaseReceiver {
 			WakefulIntentService.sendWakefulWork(context, i);
 			am.cancel(pi);
 		}
-		w("alarms " + (setup ? "enabled" : "disabled"));
+		d("alarms " + (setup ? "enabled" : "disabled"));
 	}
 }

@@ -6,16 +6,12 @@ import android.net.Uri;
 import android.telephony.TelephonyManager;
 import android.util.Log;
 
-import com.commonsware.cwac.wakeful.WakefulIntentService;
-
 import gr.uoa.di.android.helpers.FileIO;
 import gr.uoa.di.monitoring.android.AccessPreferences;
-import gr.uoa.di.monitoring.android.C;
-import gr.uoa.di.monitoring.android.Logging;
 import gr.uoa.di.monitoring.android.R;
 import gr.uoa.di.monitoring.android.persist.FileStore;
 import gr.uoa.di.monitoring.android.persist.FileStore.Fields;
-import gr.uoa.di.monitoring.android.receivers.BaseMonitoringReceiver;
+import gr.uoa.di.monitoring.android.receivers.BaseAlarmReceiver;
 import gr.uoa.di.monitoring.android.receivers.BaseReceiver;
 import gr.uoa.di.monitoring.android.receivers.BatteryMonitoringReceiver;
 import gr.uoa.di.monitoring.android.receivers.LocationMonitoringReceiver;
@@ -34,9 +30,8 @@ import static gr.uoa.di.monitoring.android.C.ISO8859;
 import static gr.uoa.di.monitoring.android.C.ac_cancel_alarm;
 import static gr.uoa.di.monitoring.android.C.ac_setup_alarm;
 
-public abstract class Monitor extends WakefulIntentService implements Logging {
+public abstract class Monitor extends AlarmService {
 
-	private final String tag_ = this.getClass().getSimpleName();
 	private static final String TAG = Monitor.class.getSimpleName();
 	// Persistence
 	/**
@@ -48,9 +43,8 @@ public abstract class Monitor extends WakefulIntentService implements Logging {
 	private static String sImei;
 	private static String sRootFolder;
 	// Monitoring
-	private static final int INITIAL_DELAY = 5000; // 5 seconds
 	private static final List<Class<? extends BaseReceiver>> RECEIVERS = new ArrayList<Class<? extends BaseReceiver>>();
-	private static final List<Class<? extends BaseMonitoringReceiver>> SETUP_ALARM_RECEIVERS = new ArrayList<Class<? extends BaseMonitoringReceiver>>();
+	private static final List<Class<? extends BaseAlarmReceiver>> SETUP_ALARM_RECEIVERS = new ArrayList<Class<? extends BaseAlarmReceiver>>();
 	// subclasses fields - subclasses are final so those have default scope
 	/** Delimiter used to separate the items in debug prints */
 	static final String DEBUG_DELIMITER = "::";
@@ -86,15 +80,13 @@ public abstract class Monitor extends WakefulIntentService implements Logging {
 	// =========================================================================
 	// Abstract methods
 	// =========================================================================
-	public abstract long getInterval();
-
 	/**
 	 * Enforces monitors to return a prefix prepended to the filename where the
 	 * data is persisted. This way the various files are differentiated
 	 *
 	 * @return the prefix used by the file where the data is persisted
 	 */
-	public abstract String logPrefix();
+	abstract String logPrefix();
 
 	/**
 	 * Enforces Monitors to define cleanup actions to be performed when
@@ -112,10 +104,6 @@ public abstract class Monitor extends WakefulIntentService implements Logging {
 	// =========================================================================
 	// API
 	// =========================================================================
-	public static int getInitialDelay() {
-		return INITIAL_DELAY;
-	}
-
 	public static void enableMonitoring(Context ctx, boolean enable) {
 		Log.d(TAG, "enableMonitoring : " + enable);
 		Log.d(TAG, "setup/cancel alarms : "
@@ -130,7 +118,7 @@ public abstract class Monitor extends WakefulIntentService implements Logging {
 	}
 
 	private static void _setupCancelAlarms(Context ctx, boolean enable) {
-		for (Class<? extends BaseMonitoringReceiver> sEClass : SETUP_ALARM_RECEIVERS) {
+		for (Class<? extends BaseAlarmReceiver> sEClass : SETUP_ALARM_RECEIVERS) {
 			Intent i = new Intent(""
 				+ (enable ? ac_setup_alarm : ac_cancel_alarm), Uri.EMPTY, ctx,
 					sEClass);
@@ -146,19 +134,11 @@ public abstract class Monitor extends WakefulIntentService implements Logging {
 	}
 
 	// =========================================================================
-	// methods used by the subclasses
+	// Methods used by the subclasses
 	// =========================================================================
 	<T extends Enum<T> & Fields> void saveData(List<byte[]> listByteArrays,
 			List<List<byte[]>> listOfListsOfByteArrays, Class<T> fields) {
 		try {
-			// if (DEBUG) {
-			// // write in external storage so I can see what goes
-			// // on
-			// File file = FileIO.fileExternalTopLevel(LOG_DIR, fileName(),
-			// null);
-			// FileStore.persist(file, fields, listByteArrays,
-			// listOfListsOfByteArrays);
-			// }
 			// internal storage
 			FileStore.persist(dataFileInInternalStorage(), fields,
 				listByteArrays, listOfListsOfByteArrays);
@@ -173,17 +153,7 @@ public abstract class Monitor extends WakefulIntentService implements Logging {
 
 	void saveData(List<byte[]> listByteArrays) {
 		try {
-			// if (DEBUG) {
-			// // write in external storage so I can see what goes
-			// // on
-			// File file = FileIO.fileExternalTopLevel(LOG_DIR, fileName(),
-			// null);
-			// // w("FileIO.fileExternalTopLevel : " + file.getAbsolutePath());
-			// FileStore.persist(file, listByteArrays);
-			// }
 			// internal storage
-			// w("dataFileInInternalStorage() : " +
-			// dataFileInInternalStorage());
 			FileStore.persist(dataFileInInternalStorage(), listByteArrays);
 		} catch (FileNotFoundException e) {
 			// TODO abort ?
@@ -240,25 +210,6 @@ public abstract class Monitor extends WakefulIntentService implements Logging {
 	 */
 	String fileName() {
 		return logPrefix();
-	}
-
-	// =========================================================================
-	// LOGGING
-	// =========================================================================
-	@Override
-	public void w(String msg) {
-		C.w(tag_, msg);
-
-	}
-
-	@Override
-	public void d(String msg) {
-		C.d(tag_, msg);
-	}
-
-	@Override
-	public void v(String msg) {
-		C.v(tag_, msg);
 	}
 }
 

@@ -72,6 +72,17 @@ public final class C {
 	public static final String LOG_FILE = "LOG.log";
 	private static final String LOG_CHARSET_NAME = UTF8;
 
+	/**
+	 * The log file used during debugging
+	 *
+	 * @return the File object that corresponds to the logfile - in external
+	 *         public storage
+	 * @throws IOException
+	 */
+	public static File logFile() throws IOException {
+		return FileIO.fileExternalPublicStorage(LOG_DIR, LOG_FILE, null);
+	}
+
 	// TODO : docs/test
 	public static Intent launchSettingsIntent(final String action) {
 		// see http://stackoverflow.com/a/7024631/281545
@@ -132,9 +143,7 @@ public final class C {
 			// File outputFile = FileIO.fileExternalApplicationStorage(this,
 			// sRootFolder, fileName());
 			// FileIO.append(outputFile, msg + "\n", LOG_CHARSET_NAME);
-			File outputFile = FileIO.fileExternalPublicStorage(LOG_DIR,
-				LOG_FILE,
-				null);
+			File outputFile = logFile();
 			FileIO.append(outputFile, msg + "\n", LOG_CHARSET_NAME);
 		} catch (FileNotFoundException e) {
 			Log.w(tag, e.getMessage());

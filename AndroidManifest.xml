@@ -11,6 +11,7 @@
     <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.INTERNET" />
     <uses-sdk
         android:minSdkVersion="8"
         android:targetSdkVersion="17" />
@@ -74,6 +75,7 @@
         <service android:name=".services.WifiMonitor" />
         <service android:name=".services.LocationMonitor" />
         <service android:name=".services.WifiMonitor$Gatekeeper" />
+        <service android:name=".services.NetworkService" />
         <activity
             android:name="gr.uoa.di.monitoring.android.activities.DialogActivity"
             android:label="@string/title_activity_dialog"

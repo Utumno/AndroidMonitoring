@@ -4,11 +4,8 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.os.BatteryManager;
 
-import gr.uoa.di.monitoring.android.persist.FileStore.Fields;
+import gr.uoa.di.monitoring.model.Battery;
 
-import org.apache.http.util.EncodingUtils;
-
-import java.util.ArrayList;
 import java.util.List;
 
 public final class BatteryMonitor extends Monitor {
@@ -53,46 +50,8 @@ public final class BatteryMonitor extends Monitor {
 
 	@Override
 	<T> void saveResults(T data) {
-		List<byte[]> listByteArrays = BatteryFields
+		List<byte[]> listByteArrays = Battery.BatteryFields
 				.createListOfByteArrays(data);
 		saveData(listByteArrays);
-	}
-
-	private static enum BatteryFields implements Fields {
-		TIME {
-
-			@Override
-			public <T> List<byte[]> getData(T data) {
-				// TODO time()
-				List<byte[]> arrayList = new ArrayList<byte[]>();
-				arrayList.add(EncodingUtils.getAsciiBytes(System
-						.currentTimeMillis() + ""));
-				return arrayList;
-			}
-		},
-		STATUS {
-
-			@Override
-			public <T> List<byte[]> getData(T data) {
-				final Intent batteryStatus = (Intent) data;
-				List<byte[]> arrayList = new ArrayList<byte[]>();
-				arrayList.add(EncodingUtils.getAsciiBytes(batteryStatus
-						.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) + ""));
-				return arrayList;
-			}
-		};
-
-		@Override
-		public boolean isList() {
-			return false; // no lists here
-		}
-
-		public static <T> List<byte[]> createListOfByteArrays(T data) {
-			final List<byte[]> listByteArrays = new ArrayList<byte[]>();
-			for (BatteryFields bs : BatteryFields.values()) {
-				if (!bs.isList()) listByteArrays.add(bs.getData(data).get(0));
-			}
-			return listByteArrays;
-		}
 	}
 }
