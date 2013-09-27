@@ -12,7 +12,7 @@ import static gr.uoa.di.monitoring.android.C.ac_location_data;
 
 public final class LocationReceiver extends BaseReceiver {
 
-	private static final Class<? extends Monitor> MONITOR_CLASS = LocationMonitor.class;
+	private static final Class<? extends Monitor<?, ?>> MONITOR_CLASS = LocationMonitor.class;
 
 	@Override
 	public void onReceive(Context context, Intent intent) {

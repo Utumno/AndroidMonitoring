@@ -6,7 +6,8 @@ import gr.uoa.di.monitoring.android.services.WifiMonitor;
 public final class WifiMonitoringReceiver extends BaseAlarmReceiver {
 
 	@Override
-	protected Class<? extends Monitor> getService() {
+	// notice I return a Monitor
+	protected Class<? extends Monitor<?, ?>> getService() {
 		return WifiMonitor.class;
 	}
 }

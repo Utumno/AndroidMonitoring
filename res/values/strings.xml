@@ -17,4 +17,9 @@
     <string name="title_activity_dialog">DialogActivity</string>
     <string name="str_b_yes">Yes</string>
     <string name="str_b_no">No</string>
+    <string name="server_url_pref_key">server_url</string>
+    <string name="str_pref_server_url_summary">The url of the server - include the port</string>
+    <string name="str_pref_server_url_title">Server url</string>
+    <string name="str_pref_server_url_default">http://192.168.1.64:8080/DataCollectionServlet/</string>
+    <string name="menu_send_files">Send files</string>
 </resources>

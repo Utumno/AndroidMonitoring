@@ -9,6 +9,7 @@ import gr.uoa.di.monitoring.android.R;
 
 public class MonitorActivity extends FragmentActivity {
 
+	@SuppressWarnings("unused")
 	private final Intent monitorActivityIntent = getIntent();
 
 	@Override

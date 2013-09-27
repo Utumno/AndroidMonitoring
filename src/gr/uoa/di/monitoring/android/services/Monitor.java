@@ -3,45 +3,30 @@ package gr.uoa.di.monitoring.android.services;
 import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
-import android.telephony.TelephonyManager;
 import android.util.Log;
 
-import gr.uoa.di.android.helpers.FileIO;
-import gr.uoa.di.monitoring.android.AccessPreferences;
 import gr.uoa.di.monitoring.android.R;
-import gr.uoa.di.monitoring.android.persist.FileStore;
-import gr.uoa.di.monitoring.android.persist.FileStore.Fields;
 import gr.uoa.di.monitoring.android.receivers.BaseAlarmReceiver;
 import gr.uoa.di.monitoring.android.receivers.BaseReceiver;
 import gr.uoa.di.monitoring.android.receivers.BatteryMonitoringReceiver;
 import gr.uoa.di.monitoring.android.receivers.LocationMonitoringReceiver;
+import gr.uoa.di.monitoring.android.receivers.NetworkReceiver;
 import gr.uoa.di.monitoring.android.receivers.TriggerMonitoringBootReceiver;
 import gr.uoa.di.monitoring.android.receivers.WifiMonitoringReceiver;
+import gr.uoa.di.monitoring.model.Data;
 
-import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.List;
 
 import static gr.uoa.di.monitoring.android.C.DISABLE;
-import static gr.uoa.di.monitoring.android.C.ISO8859;
 import static gr.uoa.di.monitoring.android.C.ac_cancel_alarm;
 import static gr.uoa.di.monitoring.android.C.ac_setup_alarm;
 
-public abstract class Monitor extends AlarmService {
+public abstract class Monitor<K, Y extends Data> extends AlarmService {
 
 	private static final String TAG = Monitor.class.getSimpleName();
-	// Persistence
-	/**
-	 * The name of the charset to use when writing to files - ISO-8859-1 for
-	 * space and byte preservation
-	 */
-	static final String CHARSET_NAME = ISO8859;
-	private static final String NO_IMEI = "NO_IMEI";
-	private static String sImei;
-	private static String sRootFolder;
 	// Monitoring
 	private static final List<Class<? extends BaseReceiver>> RECEIVERS = new ArrayList<Class<? extends BaseReceiver>>();
 	private static final List<Class<? extends BaseAlarmReceiver>> SETUP_ALARM_RECEIVERS = new ArrayList<Class<? extends BaseAlarmReceiver>>();
@@ -52,6 +37,7 @@ public abstract class Monitor extends AlarmService {
 		SETUP_ALARM_RECEIVERS.add(BatteryMonitoringReceiver.class);
 		SETUP_ALARM_RECEIVERS.add(WifiMonitoringReceiver.class);
 		SETUP_ALARM_RECEIVERS.add(LocationMonitoringReceiver.class);
+		SETUP_ALARM_RECEIVERS.add(NetworkReceiver.class);
 		RECEIVERS.addAll(SETUP_ALARM_RECEIVERS);
 		RECEIVERS.add(TriggerMonitoringBootReceiver.class);
 	}
@@ -60,34 +46,9 @@ public abstract class Monitor extends AlarmService {
 		super(name);
 	}
 
-	@Override
-	public void onCreate() {
-		super.onCreate();
-		try {
-			if (sImei == null) {
-				final Context applicationContext = getApplicationContext();
-				TelephonyManager tm = (TelephonyManager) applicationContext
-						.getSystemService(Context.TELEPHONY_SERVICE);
-				sImei = tm.getDeviceId();
-			}
-		} catch (NullPointerException e) {
-			w("No imei today : " + e);
-			sImei = NO_IMEI;
-		}
-		sRootFolder = sImei; // have to do it here
-	}
-
 	// =========================================================================
 	// Abstract methods
 	// =========================================================================
-	/**
-	 * Enforces monitors to return a prefix prepended to the filename where the
-	 * data is persisted. This way the various files are differentiated
-	 *
-	 * @return the prefix used by the file where the data is persisted
-	 */
-	abstract String logPrefix();
-
 	/**
 	 * Enforces Monitors to define cleanup actions to be performed when
 	 * monitoring is disabled and they receive the ac_aborting action
@@ -97,9 +58,11 @@ public abstract class Monitor extends AlarmService {
 	/**
 	 * Enforces monitors to persist their data
 	 *
-	 * @param <T>
+	 * @param <K>
+	 * @throws IOException
+	 * @throws FileNotFoundException
 	 */
-	abstract <T> void saveResults(T data);
+	abstract void saveResults(K data) throws FileNotFoundException, IOException;
 
 	// =========================================================================
 	// API
@@ -136,12 +99,17 @@ public abstract class Monitor extends AlarmService {
 	// =========================================================================
 	// Methods used by the subclasses
 	// =========================================================================
-	<T extends Enum<T> & Fields> void saveData(List<byte[]> listByteArrays,
-			List<List<byte[]>> listOfListsOfByteArrays, Class<T> fields) {
+	/**
+	 * Save the data into internal storage. Encapsulates common behavior of
+	 * monitors on failing to write the data
+	 *
+	 * @param data
+	 * @return
+	 */
+	boolean save(K data) {
 		try {
-			// internal storage
-			FileStore.persist(dataFileInInternalStorage(), fields,
-				listByteArrays, listOfListsOfByteArrays);
+			saveResults(data);
+			return true;
 		} catch (FileNotFoundException e) {
 			// TODO abort ?
 			w("IO exception writing data :" + e.getMessage());
@@ -149,27 +117,7 @@ public abstract class Monitor extends AlarmService {
 			// TODO abort ?
 			w("IO exception writing data :" + e.getMessage());
 		}
-	}
-
-	void saveData(List<byte[]> listByteArrays) {
-		try {
-			// internal storage
-			FileStore.persist(dataFileInInternalStorage(), listByteArrays);
-		} catch (FileNotFoundException e) {
-			// TODO abort ?
-			w("IO exception writing data :" + e.getMessage());
-		} catch (IOException e) {
-			// TODO abort ?
-			w("IO exception writing data :" + e.getMessage());
-		}
-	}
-
-	<T> void persist(String key, T value) {
-		AccessPreferences.persist(this, key, value);
-	}
-
-	<T> T retrieve(String key, T value) {
-		return AccessPreferences.retrieve(this, key, value);
+		return false;
 	}
 
 	void abort() {
@@ -182,11 +130,6 @@ public abstract class Monitor extends AlarmService {
 		}
 	}
 
-	File dataFileInInternalStorage() throws IOException {
-		File internalDir = FileIO.createDirInternal(this, sRootFolder);
-		return new File(internalDir, fileName());
-	}
-
 	/**
 	 * Debug header containing the time in human readable format - uses
 	 * DEBUG_DELIMITER
@@ -196,20 +139,9 @@ public abstract class Monitor extends AlarmService {
 	StringBuilder debugHeader() {
 		StringBuilder sb = new StringBuilder();
 		// sb.append(System.currentTimeMillis() / 1000);
-		sb.append(new Date(System.currentTimeMillis()));
+		sb.append(time());
 		sb.append(DEBUG_DELIMITER);
 		return sb;
-	}
-
-	/**
-	 * Creates the filename of the file the data is persisted. For the moment
-	 * the filename is the string returned by {@code filePrefix()} but TODO :
-	 * add a preferences-persisted mechanism to break the files via timestamp
-	 *
-	 * @return
-	 */
-	String fileName() {
-		return logPrefix();
 	}
 }
 
@@ -227,7 +159,7 @@ enum MonitoringInterval {
 		return interval;
 	}
 
-	MonitoringInterval lessOften(MonitoringInterval mi) {
+	static MonitoringInterval lessOften(MonitoringInterval mi) {
 		int ordinal = mi.ordinal();
 		if (ordinal < values().length - 1) {
 			++ordinal;
@@ -235,7 +167,7 @@ enum MonitoringInterval {
 		return values()[ordinal];
 	}
 
-	MonitoringInterval moreOften(MonitoringInterval mi) {
+	static MonitoringInterval moreOften(MonitoringInterval mi) {
 		int ordinal = mi.ordinal();
 		if (ordinal > 0) {
 			--ordinal;

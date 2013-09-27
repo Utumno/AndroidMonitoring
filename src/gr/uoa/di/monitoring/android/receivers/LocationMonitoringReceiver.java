@@ -6,7 +6,8 @@ import gr.uoa.di.monitoring.android.services.Monitor;
 public final class LocationMonitoringReceiver extends BaseAlarmReceiver {
 
 	@Override
-	protected Class<? extends Monitor> getService() {
+	// notice I return a Monitor
+	protected Class<? extends Monitor<?, ?>> getService() {
 		return LocationMonitor.class;
 	}
 }

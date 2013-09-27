@@ -32,6 +32,11 @@ abstract class BaseActivity extends Activity implements Logging {
 	}
 
 	@Override
+	public void w(String msg, Throwable t) {
+		C.w(tag_, msg, t);
+	}
+
+	@Override
 	public void d(String msg) {
 		C.d(tag_, msg);
 	}

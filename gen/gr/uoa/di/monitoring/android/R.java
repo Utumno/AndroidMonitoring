@@ -32,13 +32,14 @@ public final class R {
     }
     public static final class id {
         public static final int about_button=0x7f0b0006;
-        public static final int action_settings=0x7f0b000b;
+        public static final int action_settings=0x7f0b000c;
         public static final int batteryTextHealth=0x7f0b0009;
         public static final int battery_button=0x7f0b0003;
         public static final int dialog_activity_no_button=0x7f0b0002;
         public static final int dialog_activity_yes_button=0x7f0b0001;
         public static final int dialog_text=0x7f0b0000;
         public static final int gps_button=0x7f0b0004;
+        public static final int menu_send_files=0x7f0b000b;
         public static final int menu_settings=0x7f0b000a;
         public static final int monitor_details=0x7f0b0007;
         public static final int monitor_preferences=0x7f0b0008;
@@ -61,15 +62,17 @@ public final class R {
         public static final int app_name=0x7f060001;
         public static final int enable_monitoring_master_pref_key=0x7f060000;
         public static final int main_title=0x7f060004;
+        public static final int menu_send_files=0x7f060016;
         public static final int menu_settings=0x7f060003;
         public static final int pref_enable_monitoring_summary=0x7f06000d;
         public static final int pref_enable_monitoring_title=0x7f06000e;
         /**  Strings related to Settings 
  Example settings for Data & Sync 
          */
-        public static final int pref_header_data_sync=0x7f060013;
-        public static final int pref_title_sync_frequency=0x7f060014;
-        public static final int pref_title_system_sync_settings=0x7f060015;
+        public static final int pref_header_data_sync=0x7f060018;
+        public static final int pref_title_sync_frequency=0x7f060019;
+        public static final int pref_title_system_sync_settings=0x7f06001a;
+        public static final int server_url_pref_key=0x7f060012;
         public static final int str_b_about=0x7f060005;
         public static final int str_b_battery=0x7f060006;
         public static final int str_b_gps=0x7f060007;
@@ -78,10 +81,13 @@ public final class R {
         public static final int str_b_yes=0x7f060010;
         public static final int str_pref_monitor_off=0x7f06000b;
         public static final int str_pref_monitor_on=0x7f06000c;
+        public static final int str_pref_server_url_default=0x7f060015;
+        public static final int str_pref_server_url_summary=0x7f060013;
+        public static final int str_pref_server_url_title=0x7f060014;
         public static final int title_activity_dialog=0x7f06000f;
         public static final int title_activity_main=0x7f060002;
         public static final int title_activity_monitor=0x7f060009;
-        public static final int title_activity_settings=0x7f060012;
+        public static final int title_activity_settings=0x7f060017;
     }
     public static final class style {
         /** 
@@ -113,7 +119,8 @@ public final class R {
     }
     public static final class xml {
         public static final int pref_data_sync=0x7f040000;
-        public static final int pref_general=0x7f040001;
-        public static final int pref_headers=0x7f040002;
+        public static final int pref_data_sync_debug=0x7f040001;
+        public static final int pref_general=0x7f040002;
+        public static final int pref_headers=0x7f040003;
     }
 }

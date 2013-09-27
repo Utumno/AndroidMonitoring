@@ -11,6 +11,7 @@ import android.support.v4.app.NotificationCompat;
 import android.util.Log;
 
 import gr.uoa.di.android.helpers.FileIO;
+import gr.uoa.di.java.helpers.Utils;
 
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -23,22 +24,6 @@ import java.io.IOException;
  */
 public final class C {
 
-	// Standard charsets' NAMES
-	// Seven-bit ASCII, a.k.a. ISO646-US, a.k.a. the Basic Latin block of the
-	// Unicode character set
-	public static final String ASCII = "US-ASCII";
-	// ISO Latin Alphabet No. 1, a.k.a. ISO-LATIN-1
-	public static final String ISO8859 = "ISO-8859-1";
-	// Eight-bit UCS Transformation Format
-	public static final String UTF8 = "UTF-8";
-	// Sixteen-bit UCS Transformation Format, big-endian byte order
-	public static final String UTF16BE = "UTF-16BE";
-	// Sixteen-bit UCS Transformation Format, little-endian byte order
-	public static final String UTF16LE = "UTF-16LE";
-	// Sixteen-bit UCS Transformation Format, byte order identified by an
-	// optional byte-order mark
-	public static final String UTF16 = "UTF-16";
-	// / Standard charsets' NAMES
 	public static final String APP_PACKAGE_NAME = C.class.getPackage()
 			.toString().split(" ")[1];
 	public static final int UNDEFINED = -1;
@@ -63,14 +48,14 @@ public final class C {
 	public static final boolean DISABLE = false;
 	public static final boolean ENABLE = true;
 	public static final boolean VERBOSE = false;
+	public static final boolean DEBUG = BuildConfig.DEBUG;
 	public static final boolean INFO = true;
-	public static final boolean DEBUG = true;
 	public static final boolean WARN = true;
 	public static final boolean ERROR = true;
 	public static final int NOT_USED = 0;
-	public static final String LOG_DIR = "";
-	public static final String LOG_FILE = "LOG.log";
-	private static final String LOG_CHARSET_NAME = UTF8;
+	private static final String LOG_DIR = "___MYLOGS";
+	private static final String LOG_FILE = "LOG.log";
+	private static final String LOG_CHARSET_NAME = Utils.UTF8;
 
 	/**
 	 * The log file used during debugging
@@ -114,7 +99,7 @@ public final class C {
 	public static void triggerNotification(Context context, CharSequence title,
 			CharSequence message, Intent intent, String tag, int id) {
 		PendingIntent pi = PendingIntent.getActivity(context, NOT_USED, intent,
-			PendingIntent.FLAG_UPDATE_CURRENT); // PendingIntent.FLAG_UPDATE_CURRENT?
+			PendingIntent.FLAG_UPDATE_CURRENT); // FLAG_UPDATE_CURRENT?
 		Notification not = new NotificationCompat.Builder(context)
 				.setContentTitle(title).setContentText(message)
 				.setContentIntent(pi)
@@ -158,5 +143,9 @@ public final class C {
 
 	public static void v(String tag, String msg) {
 		if (VERBOSE) Log.v(tag, msg);
+	}
+
+	public static void w(String tag, String msg, Throwable t) {
+		if (WARN) Log.w(tag, msg, t);
 	}
 }

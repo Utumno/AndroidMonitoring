@@ -16,6 +16,8 @@ import gr.uoa.di.monitoring.android.receivers.BaseReceiver;
 import gr.uoa.di.monitoring.android.receivers.LocationReceiver;
 import gr.uoa.di.monitoring.model.Position;
 
+import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
 
@@ -28,17 +30,16 @@ import static gr.uoa.di.monitoring.android.C.ac_location_data;
 import static gr.uoa.di.monitoring.android.C.launchSettingsIntent;
 import static gr.uoa.di.monitoring.android.C.triggerNotification;
 
-public final class LocationMonitor extends Monitor {
+public final class LocationMonitor extends Monitor<Location, Position> {
 
-	private static final String LOG_PREFIX = "loc";
-	private static final long LOCATION_MONITORING_INTERVAL = 2 * 60 * 1000;
+	private static final long LOCATION_MONITORING_INTERVAL = 2 * 60 * 1000L;
 	private static final Class<? extends BaseReceiver> PERSONAL_RECEIVER = LocationReceiver.class;
 	// Location api calls constants
 	private static final int MIN_TIME_BETWEEN_SCANS = 1 * 30 * 1000; // 30 secs
 	private static final int MIN_DISTANCE = 0;
 	public static final String NOTIFICATION_TAG = LocationMonitor.class
 			.getSimpleName() + ".Notification";
-	public static final int NOTIFICATION_ID = 9200;
+	private static final int NOTIFICATION_ID = 9200;
 	// convenience fields
 	private static LocationManager lm; // not final cause we need a f*ng context
 	// members
@@ -117,7 +118,7 @@ public final class LocationMonitor extends Monitor {
 					// maybe I'll screw up my next update request ?
 					lm().removeUpdates(pi);
 					// persist
-					saveResults(loc);
+					save(loc);
 				}
 			} else {
 				w(sb + "NULL EXTRAS");
@@ -210,8 +211,7 @@ public final class LocationMonitor extends Monitor {
 				stat.title(), stat.dialog(), stat.launchIntent());
 			// intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK); // nope
 			triggerNotification(ctx, stat.title(), stat.notification(), intent,
-				LocationMonitor.NOTIFICATION_TAG,
-				LocationMonitor.NOTIFICATION_ID);
+				NOTIFICATION_TAG, NOTIFICATION_ID);
 		}
 
 		@SuppressWarnings("unused")
@@ -239,7 +239,7 @@ public final class LocationMonitor extends Monitor {
 				case UNKNOWN_PROVIDER:
 					return "Unknown location provider";
 				case NETWORK_NOT_ENABLED:
-					return "Enable wifi";
+					return "Switch wifi or GPS on";
 				}
 				throw new IllegalStateException("Forgotten enum constant");
 			}
@@ -259,7 +259,7 @@ public final class LocationMonitor extends Monitor {
 				case NETWORK:
 					return "Location is provided by your wireless connection. "
 						+ "That is the best option for monitoring the location"
-						+ " if outdoors. Please consider connecting to the GPS "
+						+ " if indoors. Please consider connecting to the GPS "
 						+ "provider while outdoors\n";
 				case UNKNOWN_PROVIDER:
 					return "No known location services. Monitoring has "
@@ -315,8 +315,7 @@ public final class LocationMonitor extends Monitor {
 			}
 
 			private boolean notAvailabe() {
-				if (this == GPS || this == NETWORK) return false;
-				return true;
+				return !(this == GPS || this == NETWORK);
 			}
 		}
 	}
@@ -327,14 +326,10 @@ public final class LocationMonitor extends Monitor {
 	}
 
 	@Override
-	public String logPrefix() {
-		return LOG_PREFIX;
-	}
-
-	@Override
-	public <T> void saveResults(T data) {
+	public void saveResults(Location data) throws FileNotFoundException,
+			IOException {
 		List<byte[]> listByteArrays = Position.LocationFields
 				.createListOfByteArrays(data);
-		saveData(listByteArrays);
+		Position.saveData(this, listByteArrays);
 	}
 }

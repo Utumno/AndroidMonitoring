@@ -6,12 +6,13 @@ import android.os.BatteryManager;
 
 import gr.uoa.di.monitoring.model.Battery;
 
+import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.util.List;
 
-public final class BatteryMonitor extends Monitor {
+public final class BatteryMonitor extends Monitor<Intent, Battery> {
 
-	private static final String LOG_PREFIX = "batt";
-	private static final long BATTERY_MONITORING_INTERVAL = 10 * 60 * 1000;
+	private static final long BATTERY_MONITORING_INTERVAL = 10 * 60 * 1000L;
 
 	public BatteryMonitor() {
 		// needed for service instantiation by Android. See :
@@ -29,8 +30,8 @@ public final class BatteryMonitor extends Monitor {
 		// set the default to -1 as per :
 		// http://developer.android.com/training/monitoring-device-state/battery-monitoring.html
 		sb.append(batteryStatus.getIntExtra(BatteryManager.EXTRA_LEVEL, -1));
-		saveResults(batteryStatus);
 		w(sb.toString());
+		save(batteryStatus);
 	}
 
 	@Override
@@ -44,14 +45,9 @@ public final class BatteryMonitor extends Monitor {
 	}
 
 	@Override
-	public String logPrefix() {
-		return LOG_PREFIX;
-	}
-
-	@Override
-	<T> void saveResults(T data) {
+	void saveResults(Intent data) throws FileNotFoundException, IOException {
 		List<byte[]> listByteArrays = Battery.BatteryFields
 				.createListOfByteArrays(data);
-		saveData(listByteArrays);
+		Battery.saveData(this, listByteArrays);
 	}
 }

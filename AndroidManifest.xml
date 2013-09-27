@@ -64,6 +64,10 @@
             android:enabled="false" >
         </receiver>
         <receiver
+            android:name=".receivers.NetworkReceiver"
+            android:enabled="false" >
+        </receiver>
+        <receiver
             android:name=".receivers.ScanResultsReceiver"
             android:enabled="false" >
             <intent-filter>

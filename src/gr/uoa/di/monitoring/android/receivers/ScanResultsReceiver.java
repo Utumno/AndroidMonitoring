@@ -26,8 +26,8 @@ import static gr.uoa.di.monitoring.android.C.ac_scan_wifi_enabled;
  */
 public final class ScanResultsReceiver extends BaseReceiver {
 
-	private boolean disabled = false;
-	private static final Class<? extends Monitor> MONITOR_CLASS = WifiMonitor.class;
+	private boolean disabled = false; // TODO : static ??
+	private static final Class<? extends Monitor<?, ?>> MONITOR_CLASS = WifiMonitor.class;
 
 	@Override
 	public void onReceive(Context context, Intent intent) {

@@ -2,14 +2,18 @@ package gr.uoa.di.monitoring.android.services;
 
 import com.commonsware.cwac.wakeful.WakefulIntentService;
 
+import gr.uoa.di.android.helpers.AccessPreferences;
 import gr.uoa.di.monitoring.android.C;
 import gr.uoa.di.monitoring.android.Logging;
+
+import java.util.Date;
 
 public abstract class AlarmService extends WakefulIntentService implements
 		Logging {
 
 	private static final int INITIAL_DELAY = 5000;
 	private final String tag_ = this.getClass().getSimpleName();
+	// final String NOTIFICATION_TAG=tag_+".Notification"; //nope-must be static
 
 	public AlarmService(String name) {
 		super(name);
@@ -22,11 +26,36 @@ public abstract class AlarmService extends WakefulIntentService implements
 	}
 
 	// =========================================================================
+	// Methods used by the subclasses
+	// =========================================================================
+	<T> void persist(String key, T value) {
+		AccessPreferences.put(this, key, value);
+	}
+
+	<T> T retrieve(String key, T value) {
+		return AccessPreferences.get(this, key, value);
+	}
+
+	/**
+	 * Human readable time
+	 *
+	 * @return a human readable current time
+	 */
+	String time() {
+		return new Date(System.currentTimeMillis()).toString();
+	}
+
+	// =========================================================================
 	// LOGGING
 	// =========================================================================
 	@Override
 	public void w(String msg) {
 		C.w(tag_, msg);
+	}
+
+	@Override
+	public void w(String msg, Throwable t) {
+		C.w(tag_, msg, t);
 	}
 
 	@Override

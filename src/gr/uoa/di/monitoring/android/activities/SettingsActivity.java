@@ -25,6 +25,8 @@ import gr.uoa.di.monitoring.android.services.Monitor;
 
 import java.util.List;
 
+import static gr.uoa.di.monitoring.android.C.DEBUG;
+
 /**
  * A {@link PreferenceActivity} that presents a set of application settings. On
  * handset devices, settings are presented as a single list. On tablets,
@@ -49,6 +51,10 @@ public class SettingsActivity extends PreferenceActivity {
 	private static final String TAG = SettingsActivity.class.getSimpleName();
 	private OnPreferenceChangeListener listener;
 	private static Preference master_pref;
+	// debug preferences
+	private static final int PREF_RESOURCE = R.xml.pref_general;
+	private static int PREF_RESOURCE_SETTINGS = (DEBUG) ? R.xml.pref_data_sync_debug
+			: R.xml.pref_data_sync;
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
@@ -117,12 +123,12 @@ public class SettingsActivity extends PreferenceActivity {
 		// getPreferenceScreen() does not return null - so I can add a header -
 		// alternatively I can very well comment everything out apart from
 		// addPreferencesFromResource(R.xml.pref_data_sync);
-		addPreferencesFromResource(R.xml.pref_general);
+		addPreferencesFromResource(PREF_RESOURCE);
 		// Add 'data and sync' preferences, and a corresponding header.
 		PreferenceCategory fakeHeader = new PreferenceCategory(this);
 		fakeHeader.setTitle(R.string.pref_header_data_sync);
 		getPreferenceScreen().addPreference(fakeHeader);
-		addPreferencesFromResource(R.xml.pref_data_sync);
+		addPreferencesFromResource(PREF_RESOURCE_SETTINGS);
 		master_pref = findPreference(master_enable.toString());
 		// FIXME : when changing the master enable pref the value is not updated
 		// if the PreferenceActivity is visible in the background

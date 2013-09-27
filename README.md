@@ -7,7 +7,8 @@ Subject to the apache licence : http://www.apache.org/licenses/LICENSE-2.0
 
 You need
 
-- the library in https://github.com/Utumno/AndroidHelpers
+- the (android) library in https://github.com/Utumno/AndroidHelpers
+- the library in https://github.com/Utumno/Helpers
 - the model in https://github.com/Utumno/MonitoringModel
 
 to compile. Clone those projects in the same workspace and you should be good to go

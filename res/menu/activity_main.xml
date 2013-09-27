@@ -1,7 +1,12 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android" >
     <item
         android:id="@+id/menu_settings"
-        android:orderInCategory="100"
+        android:orderInCategory="90"
         android:showAsAction="never"
         android:title="@string/menu_settings"/>
+    <item
+        android:id="@+id/menu_send_files"
+        android:orderInCategory="100"
+        android:showAsAction="never"
+        android:title="@string/menu_send_files"/>
 </menu>

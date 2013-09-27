@@ -2,21 +2,20 @@ package gr.uoa.di.monitoring.android.services;
 
 import android.content.Context;
 import android.content.Intent;
-import android.net.ConnectivityManager;
-import android.net.NetworkInfo;
 import android.net.wifi.ScanResult;
-import android.net.wifi.WifiInfo;
 import android.net.wifi.WifiManager;
 import android.net.wifi.WifiManager.WifiLock;
 import android.util.Log;
 
 import com.commonsware.cwac.wakeful.WakefulIntentService;
 
-import gr.uoa.di.monitoring.android.AccessPreferences;
+import gr.uoa.di.android.helpers.AccessPreferences;
 import gr.uoa.di.monitoring.android.receivers.BaseReceiver;
 import gr.uoa.di.monitoring.android.receivers.ScanResultsReceiver;
 import gr.uoa.di.monitoring.model.Wifi;
 
+import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.util.List;
 
 import static gr.uoa.di.monitoring.android.C.APP_PACKAGE_NAME;
@@ -29,11 +28,10 @@ import static gr.uoa.di.monitoring.android.C.ac_scan_wifi_disabled;
 import static gr.uoa.di.monitoring.android.C.ac_scan_wifi_enabled;
 import static gr.uoa.di.monitoring.android.C.triggerNotification;
 
-public final class WifiMonitor extends Monitor {
+public final class WifiMonitor extends Monitor<List<ScanResult>, Wifi> {
 
-	private static final String LOG_PREFIX = "wifi";
 	// TODO : timeout wait()
-	private static final long WIFI_MONITORING_INTERVAL = 1 * 60 * 1000;
+	private static final long WIFI_MONITORING_INTERVAL = 1 * 60 * 1000L;
 	private static final Class<? extends BaseReceiver> PERSONAL_RECEIVER = ScanResultsReceiver.class;
 	// Internal preferences keys - persist state even on unloading app classes
 	private static final String HAVE_ENABLED_WIFI_PREF_KEY = APP_PACKAGE_NAME
@@ -44,6 +42,9 @@ public final class WifiMonitor extends Monitor {
 	/** The tag for the wifi lock */
 	private static final String SCAN_LOCK = APP_PACKAGE_NAME
 		+ ".SCAN_WIFI_LOCK";
+	private static final String NOTIFICATION_TAG = WifiMonitor.class
+			.getSimpleName() + ".Notification";
+	private static final int NOTIFICATION_ID = 9201;
 	private static WifiLock wifiLock;
 	private static volatile boolean done = false;
 	// convenience fields
@@ -94,8 +95,15 @@ public final class WifiMonitor extends Monitor {
 						receiver(DISABLE);
 						return;
 					}
-					// wifi lock AND WAKE LOCK (Gatekeeper)-so must be here!
-					getWirelessLock();
+				}
+				// wifi lock AND WAKE LOCK (Gatekeeper)-so must be here!
+				getWirelessLock();
+				if (!haveEnabledWifi()) {
+					// I must initiate the scan here - won't get any
+					// ac_scan_wifi_enabled broadcasts
+					final boolean startScan = wm.startScan();
+					d("Start scan : " + startScan);
+					if (!startScan) done = true;
 				}
 			} else if (ac_scan_wifi_enabled.equals(action)) {
 				final boolean startScan = wm.startScan();
@@ -122,7 +130,7 @@ public final class WifiMonitor extends Monitor {
 			synchronized (Gatekeeper.WIFI_MONITOR) {
 				if (done) {
 					warnScanResults(sb);
-					saveResults(wm.getScanResults());
+					save(wm.getScanResults());
 					disableWifiIfIhadItEnableMyself();
 					d("Releasing wake lock for the scan");
 					releaseWifiLock();
@@ -270,19 +278,19 @@ public final class WifiMonitor extends Monitor {
 
 	public static void keepNoteToDisableWireless(Context ctx,
 			boolean disableAfterwards) {
-		AccessPreferences.persist(ctx, HAVE_ENABLED_WIFI_PREF_KEY,
+		AccessPreferences.put(ctx, HAVE_ENABLED_WIFI_PREF_KEY,
 			disableAfterwards);
 	}
 
 	public static boolean didInitiateWifiEnabling(Context ctx) {
 		// TODO : default == true ?
-		return AccessPreferences.retrieve(ctx,
-			HAVE_INITIATED_WIFI_ENABLE_PREF_KEY, true);
+		return AccessPreferences.get(ctx, HAVE_INITIATED_WIFI_ENABLE_PREF_KEY,
+			true);
 	}
 
 	public static void setInitiatedWifiEnabling(Context ctx,
 			boolean initiatedWifiEnable) {
-		AccessPreferences.persist(ctx, HAVE_INITIATED_WIFI_ENABLE_PREF_KEY,
+		AccessPreferences.put(ctx, HAVE_INITIATED_WIFI_ENABLE_PREF_KEY,
 			initiatedWifiEnable);
 	}
 
@@ -320,24 +328,8 @@ public final class WifiMonitor extends Monitor {
 		return WIFI_MONITORING_INTERVAL;
 	}
 
-	@SuppressWarnings("unused")
-	private static String getCurrentSsid(Context context) {
-		String ssid = null;
-		ConnectivityManager connManager = (ConnectivityManager) context
-				.getSystemService(Context.CONNECTIVITY_SERVICE);
-		NetworkInfo networkInfo = connManager
-				.getNetworkInfo(ConnectivityManager.TYPE_WIFI);
-		if (networkInfo.isConnected()) {
-			final WifiInfo connectionInfo = wm.getConnectionInfo();
-			if (connectionInfo != null) {
-				ssid = connectionInfo.getSSID();
-				if (ssid != null && "".equals(ssid.trim())) ssid = null;
-			}
-		}
-		return ssid;
-	}
-
-	private void initServices(Context context) throws WmNotAvailableException {
+	private static void initServices(Context context)
+			throws WmNotAvailableException {
 		if (wm == null)
 			wm = (WifiManager) context.getSystemService(Context.WIFI_SERVICE);
 		if (wm == null) throw new WmNotAvailableException();
@@ -346,7 +338,7 @@ public final class WifiMonitor extends Monitor {
 	private static void launchNotification(Context ctx, Status stat) {
 		Intent intent = new Intent();
 		triggerNotification(ctx, stat.title(), stat.notification(), intent,
-			LocationMonitor.NOTIFICATION_TAG, LocationMonitor.NOTIFICATION_ID);
+			NOTIFICATION_TAG, NOTIFICATION_ID);
 	}
 
 	private enum Status {
@@ -374,16 +366,13 @@ public final class WifiMonitor extends Monitor {
 	}
 
 	@Override
-	public String logPrefix() {
-		return LOG_PREFIX;
-	}
-
-	@Override
-	<T> void saveResults(T data) {
+	void saveResults(List<ScanResult> data) throws FileNotFoundException,
+			IOException {
 		List<byte[]> listByteArrays = Wifi.WifiFields
 				.createListOfByteArrays(data);
 		List<List<byte[]>> listOfListsOfByteArrays = Wifi.WifiFields
 				.createListOfListsOfByteArrays(data);
-		saveData(listByteArrays, listOfListsOfByteArrays, Wifi.WifiFields.class);
+		Wifi.saveData(this, listByteArrays, listOfListsOfByteArrays,
+			Wifi.WifiFields.class);
 	}
 }

@@ -42,8 +42,6 @@ public abstract class BaseAlarmReceiver extends BaseReceiver {
 	private static final String UNABLE_TO_SET_ALARMS = "Unable to set the alarms up";
 	// constants
 	private static final int NOT_USED = 0;
-	@SuppressWarnings("unused")
-	private static final int NULL_FLAGS = 0;
 
 	@Override
 	final public void onReceive(Context context, Intent intent) {
@@ -64,7 +62,7 @@ public abstract class BaseAlarmReceiver extends BaseReceiver {
 		}
 	}
 
-	protected abstract Class<? extends Monitor> getService();
+	protected abstract Class<? extends AlarmService> getService();
 
 	private void setupAlarm(Context context, boolean setup) {
 		am = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
@@ -83,9 +81,11 @@ public abstract class BaseAlarmReceiver extends BaseReceiver {
 				throw new IllegalStateException(UNABLE_TO_SET_ALARMS, e);
 			}
 		} else {
+			// send message to the monitors that the party is over
 			Intent i = new Intent(ac_aborting.toString(), Uri.EMPTY, context,
 					monitor_class_);
 			WakefulIntentService.sendWakefulWork(context, i);
+			// cancel the alarms
 			am.cancel(pi);
 		}
 		d("alarms " + (setup ? "enabled" : "disabled"));
