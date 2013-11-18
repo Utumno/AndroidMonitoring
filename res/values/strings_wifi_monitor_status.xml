@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+	<string name="title_cant_enable">Can not enable wifi</string>
+	<string name="title_no_wifi_detected">No wifi detected</string>
+	<string name="notification_no_wifi_detected">No wireless services. Monitoring has stopped.</string>
+	<string name="notification_cant_enable">Can not enable wifi. Monitoring has stopped.</string>
+</resources>

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+	<string name="title_enable_wifi">Enable wifi</string>
+	<string name="notification_enable_wifi">There is data available to be sent. Enable wifi and try to send them manually from the application menu</string>
+	<string name="dialog_enable_wifi">You must enable wifi. If wifi is already enabled you must connect to a wireless network to send the data. Would you like to enable  wifi (If not already enabled) ?\n</string>
+</resources>

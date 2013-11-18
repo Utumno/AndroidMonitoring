@@ -10,8 +10,11 @@ import android.util.Log;
 import com.commonsware.cwac.wakeful.WakefulIntentService;
 
 import gr.uoa.di.android.helpers.AccessPreferences;
+import gr.uoa.di.monitoring.android.R;
+import gr.uoa.di.monitoring.android.activities.MonitorActivity;
 import gr.uoa.di.monitoring.android.receivers.BaseReceiver;
 import gr.uoa.di.monitoring.android.receivers.ScanResultsReceiver;
+import gr.uoa.di.monitoring.model.ParserException;
 import gr.uoa.di.monitoring.model.Wifi;
 
 import java.io.FileNotFoundException;
@@ -43,12 +46,13 @@ public final class WifiMonitor extends Monitor<List<ScanResult>, Wifi> {
 	private static final String SCAN_LOCK = APP_PACKAGE_NAME
 		+ ".SCAN_WIFI_LOCK";
 	private static final String NOTIFICATION_TAG = WifiMonitor.class
-			.getSimpleName() + ".Notification";
+		.getSimpleName() + ".Notification";
 	private static final int NOTIFICATION_ID = 9201;
+	private static final String WIFI_DATA_KEY = "WIFI_DATA_KEY";
 	private static WifiLock wifiLock;
 	private static volatile boolean done = false;
 	// convenience fields
-	private static WifiManager wm;
+	private volatile static WifiManager wm;
 
 	public WifiMonitor() {
 		// needed for service instantiation by Android
@@ -56,34 +60,21 @@ public final class WifiMonitor extends Monitor<List<ScanResult>, Wifi> {
 	}
 
 	@Override
-	public int onStartCommand(Intent intent, int flags, int startId) {
-		wm = (WifiManager) getSystemService(Context.WIFI_SERVICE);
-		// be careful to return super
-		return super.onStartCommand(intent, flags, startId);
-	}
-
-	@Override
-	public void onCreate() {
-		super.onCreate();
-		wm = (WifiManager) getSystemService(Context.WIFI_SERVICE);
-	}
-
-	@Override
 	protected void doWakefulWork(Intent in) {
 		StringBuilder sb = debugHeader();
 		final CharSequence action = in.getAction();
 		try {
-			initServices(this);
 			if (action == null) {
 				// monitor command from the alarm manager
+				// cancelNotification(this, NOTIFICATION_TAG, NOTIFICATION_ID);
 				cleanUp(); // FIXME !
 				d("Enabling the receiver");
 				receiver(ENABLE);
 				d("Check if wireless is enabled");
-				if (!wm.isWifiEnabled()) {
+				if (!wm().isWifiEnabled()) {
 					// enable wifi AFTER enabling the receiver
 					d("Wifi is not enabled - enabling...");
-					final boolean enabled = wm.setWifiEnabled(true);
+					final boolean enabled = wm().setWifiEnabled(true);
 					if (enabled) {
 						setInitiatedWifiEnabling(this, true);
 						d("Note to self I should disable again");
@@ -101,12 +92,12 @@ public final class WifiMonitor extends Monitor<List<ScanResult>, Wifi> {
 				if (!haveEnabledWifi()) {
 					// I must initiate the scan here - won't get any
 					// ac_scan_wifi_enabled broadcasts
-					final boolean startScan = wm.startScan();
+					final boolean startScan = wm().startScan();
 					d("Start scan : " + startScan);
 					if (!startScan) done = true;
 				}
 			} else if (ac_scan_wifi_enabled.equals(action)) {
-				final boolean startScan = wm.startScan();
+				final boolean startScan = wm().startScan();
 				d("Start scan : " + startScan);
 				if (!startScan) done = true;
 			} else if (ac_scan_results_available.equals(action)) {
@@ -130,7 +121,7 @@ public final class WifiMonitor extends Monitor<List<ScanResult>, Wifi> {
 			synchronized (Gatekeeper.WIFI_MONITOR) {
 				if (done) {
 					warnScanResults(sb);
-					save(wm.getScanResults());
+					save(wm().getScanResults());
 					disableWifiIfIhadItEnableMyself();
 					d("Releasing wake lock for the scan");
 					releaseWifiLock();
@@ -164,12 +155,12 @@ public final class WifiMonitor extends Monitor<List<ScanResult>, Wifi> {
 	private void cleanUp() {
 		d("Check for leftovers from previous runs");
 		if (haveEnabledWifi()) {
-			w("Oops - I have enabled wifi and never disabled - receiver not run");
-			w("but it is still enabled so disable it first.");
+			w("Oops - I have enabled wifi and never disabled - receiver not run"
+				+ " - but it is still enabled so disable it first.");
 			receiver(DISABLE);
 			w("Clean up lock");
 			synchronized (Gatekeeper.WIFI_MONITOR) {
-				Gatekeeper.WIFI_MONITOR.notify();
+				Gatekeeper.WIFI_MONITOR.notify(); // FIXME:findbugs naked notify
 			}
 			releaseWifiLock();
 			disableWifiIfIhadItEnableMyself();
@@ -180,15 +171,15 @@ public final class WifiMonitor extends Monitor<List<ScanResult>, Wifi> {
 
 	private void releaseWifiLock() {
 		synchronized (Gatekeeper.WIFI_MONITOR) {
-			if (!getWifiLock().isHeld()) {
+			if (!getWifiLock(this).isHeld()) {
 				w("Lock is not held");
 				return;
 			}
 			Gatekeeper.release = true;
 			Gatekeeper.WIFI_MONITOR.notify();
-			while (getWifiLock().isHeld() && Gatekeeper.release) {
+			while (getWifiLock(this).isHeld() && Gatekeeper.release) {
 				try {
-					w("about to wait");
+					d("about to wait");
 					Gatekeeper.WIFI_MONITOR.wait();
 				} catch (InterruptedException e) {
 					// TODO Auto-generated catch block
@@ -203,7 +194,7 @@ public final class WifiMonitor extends Monitor<List<ScanResult>, Wifi> {
 		if (haveEnabledWifi()) {
 			d("Disabling wifi");
 			// FIXME : what if the user has enabled it meanwhile ???
-			final boolean disabled = wm.setWifiEnabled(false);
+			final boolean disabled = wm().setWifiEnabled(false);
 			if (!disabled) {
 				w("Failed to disable wireless");
 			} else {
@@ -221,7 +212,7 @@ public final class WifiMonitor extends Monitor<List<ScanResult>, Wifi> {
 
 	public static class Gatekeeper extends WakefulIntentService {
 
-		private static volatile boolean release = false;
+		static volatile boolean release = false;
 		private static final String TAG = Gatekeeper.class.getSimpleName();
 		public static final Object WIFI_MONITOR = new Object();
 
@@ -231,18 +222,18 @@ public final class WifiMonitor extends Monitor<List<ScanResult>, Wifi> {
 
 		/**
 		 * This implementation actually acquires the wifi lock (if not held) and
-		 * then waits on WifiMonitor.WIFI_MONITOR till the scan results are
-		 * available whereupon it is notified by WifiMonitor and releases the
-		 * lock. FIXME : DEBUG DEBUG DEBUG deadlocks
+		 * then waits on {@link Gatekeeper#WIFI_MONITOR} till the scan results
+		 * are available whereupon it is notified by WifiMonitor and releases
+		 * the lock. FIXME : DEBUG DEBUG DEBUG deadlocks
 		 */
 		@Override
 		protected void doWakefulWork(Intent intent) {
 			synchronized (WIFI_MONITOR) {
 				if (DEBUG) Log.d(TAG, "Got in sync block !");
-				if (!release && !getWifiLock().isHeld()) {
+				if (!release && !getWifiLock(this).isHeld()) {
 					if (DEBUG)
 						Log.d(TAG, "Actually acquiring wake lock for the scan");
-					getWifiLock().acquire();
+					getWifiLock(this).acquire();
 				}
 				// while release is false wait on the monitor - holding the
 				// Wakeful CPU wake lock and the wifi lock
@@ -257,10 +248,10 @@ public final class WifiMonitor extends Monitor<List<ScanResult>, Wifi> {
 					if (DEBUG) Log.d(TAG, "Out of wait !");
 				}
 				if (DEBUG) Log.d(TAG, "Out of while !");
-				if (getWifiLock().isHeld()) {
+				if (getWifiLock(this).isHeld()) {
 					if (DEBUG)
 						Log.d(TAG, "Actually releasing wake lock for the scan");
-					getWifiLock().release();
+					getWifiLock(this).release();
 				}
 				Gatekeeper.release = false;
 				WIFI_MONITOR.notify();
@@ -269,11 +260,11 @@ public final class WifiMonitor extends Monitor<List<ScanResult>, Wifi> {
 	}
 
 	private boolean haveEnabledWifi() {
-		return retrieve(HAVE_ENABLED_WIFI_PREF_KEY, false);
+		return getPref(HAVE_ENABLED_WIFI_PREF_KEY, false);
 	}
 
 	private void keepNoteToDisableWireless(boolean disableAfterwards) {
-		persist(HAVE_ENABLED_WIFI_PREF_KEY, disableAfterwards);
+		putPref(HAVE_ENABLED_WIFI_PREF_KEY, disableAfterwards);
 	}
 
 	public static void keepNoteToDisableWireless(Context ctx,
@@ -295,11 +286,12 @@ public final class WifiMonitor extends Monitor<List<ScanResult>, Wifi> {
 	}
 
 	private void warnScanResults(StringBuilder sb) {
-		List<ScanResult> scanRes = wm.getScanResults();
+		List<ScanResult> scanRes = wm().getScanResults();
 		if (scanRes == null) {
 			// will be null if wireless is disabled
 			// TODO : only then ???
-			w("Scan results == null - wireless enabled : " + wm.isWifiEnabled());
+			w("Scan results == null - wireless enabled : "
+				+ wm().isWifiEnabled());
 		} else {
 			if (scanRes.isEmpty()) {
 				w("No scan results available");
@@ -315,9 +307,9 @@ public final class WifiMonitor extends Monitor<List<ScanResult>, Wifi> {
 		}
 	}
 
-	private static WifiLock getWifiLock() {
+	private static WifiLock getWifiLock(Context ctx) {
 		if (wifiLock == null) {
-			wifiLock = wm.createWifiLock(WifiManager.WIFI_MODE_SCAN_ONLY,
+			wifiLock = wm(ctx).createWifiLock(WifiManager.WIFI_MODE_SCAN_ONLY,
 				SCAN_LOCK);
 		}
 		return wifiLock;
@@ -328,40 +320,59 @@ public final class WifiMonitor extends Monitor<List<ScanResult>, Wifi> {
 		return WIFI_MONITORING_INTERVAL;
 	}
 
-	private static void initServices(Context context)
-			throws WmNotAvailableException {
-		if (wm == null)
-			wm = (WifiManager) context.getSystemService(Context.WIFI_SERVICE);
-		if (wm == null) throw new WmNotAvailableException();
+	private WifiManager wm() {
+		return wm(this);
+	}
+
+	private static WifiManager wm(Context ctx) {
+		WifiManager result = wm;
+		if (result == null) {
+			synchronized (WifiMonitor.class) {
+				result = wm;
+				if (result == null) {
+					result = wm = (WifiManager) ctx
+						.getSystemService(Context.WIFI_SERVICE);
+					if (result == null) throw new WmNotAvailableException();
+				}
+			}
+		}
+		return result;
 	}
 
 	private static void launchNotification(Context ctx, Status stat) {
-		Intent intent = new Intent();
-		triggerNotification(ctx, stat.title(), stat.notification(), intent,
+		triggerNotification(ctx, stat.title(ctx), stat.notification(ctx),
 			NOTIFICATION_TAG, NOTIFICATION_ID);
 	}
 
 	private enum Status {
 		WIFI_MANAGER_UNAVAILABLE, CANT_ENABLE_WIFI;
 
-		private String title() {
-			switch (this) {
-			case CANT_ENABLE_WIFI:
-				return "Can not enable wifi";
-			case WIFI_MANAGER_UNAVAILABLE:
-				return "No wifi detected";
-			}
-			throw new IllegalStateException("Forgotten enum constant");
+		String title(Context ctx) {
+			return ctx.getString(title());
 		}
 
-		private String notification() {
+		private int title() {
+			switch (this) {
+			case CANT_ENABLE_WIFI:
+				return R.string.title_cant_enable;
+			case WIFI_MANAGER_UNAVAILABLE:
+				return R.string.title_no_wifi_detected;
+			}
+			throw new AssertionError("Forgotten enum constant");
+		}
+
+		String notification(Context ctx) {
+			return ctx.getString(notification());
+		}
+
+		private int notification() {
 			switch (this) {
 			case WIFI_MANAGER_UNAVAILABLE:
-				return "No wireless services. Monitoring has stopped.";
+				return R.string.notification_no_wifi_detected;
 			case CANT_ENABLE_WIFI:
-				return "Can not enable wifi. Monitoring has stopped.";
+				return R.string.notification_cant_enable;
 			}
-			throw new IllegalStateException("Forgotten enum constant");
+			throw new AssertionError("Forgotten enum constant");
 		}
 	}
 
@@ -369,10 +380,28 @@ public final class WifiMonitor extends Monitor<List<ScanResult>, Wifi> {
 	void saveResults(List<ScanResult> data) throws FileNotFoundException,
 			IOException {
 		List<byte[]> listByteArrays = Wifi.WifiFields
-				.createListOfByteArrays(data);
+			.createListOfByteArrays(data);
 		List<List<byte[]>> listOfListsOfByteArrays = Wifi.WifiFields
-				.createListOfListsOfByteArrays(data);
+			.createListOfListsOfByteArrays(data);
 		Wifi.saveData(this, listByteArrays, listOfListsOfByteArrays,
 			Wifi.WifiFields.class);
+		try {
+			final String string = Wifi.fromBytes(listByteArrays,
+				listOfListsOfByteArrays).toString();
+			putPref(WIFI_DATA_KEY, string);
+			runOnUiThread(new Runnable() {
+
+				@Override
+				public void run() {
+					MonitorActivity.onChange(WifiMonitor.this);
+				}
+			});
+		} catch (ParserException e) {
+			w("Corrupted data", e);
+		}
+	}
+
+	public static String dataKey() {
+		return WIFI_DATA_KEY;
 	}
 }

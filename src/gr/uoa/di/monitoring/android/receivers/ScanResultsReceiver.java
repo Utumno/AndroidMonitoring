@@ -18,7 +18,7 @@ import static gr.uoa.di.monitoring.android.C.ac_scan_wifi_enabled;
 /**
  * BroadcastReceiver registered to receive wifi scan events. If this is enabled
  * it means I wait for network scan. So I disable myself and broadcast to the
- * WiffiMotoringReceiver so it can collect the scan results. I leave wireless
+ * WiffiMonitoringReceiver so it can collect the scan results. I leave wireless
  * open since I am not sure I can have the results if not. Still TODO : what if
  * the user has enabled the wireless again meanwhile ?
  *
@@ -27,7 +27,8 @@ import static gr.uoa.di.monitoring.android.C.ac_scan_wifi_enabled;
 public final class ScanResultsReceiver extends BaseReceiver {
 
 	private boolean disabled = false; // TODO : static ??
-	private static final Class<? extends Monitor<?, ?>> MONITOR_CLASS = WifiMonitor.class;
+	private static final Class<? extends Monitor<?, ?>> MONITOR_CLASS =
+			WifiMonitor.class;
 
 	@Override
 	public void onReceive(Context context, Intent intent) {

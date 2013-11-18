@@ -28,11 +28,11 @@ public abstract class AlarmService extends WakefulIntentService implements
 	// =========================================================================
 	// Methods used by the subclasses
 	// =========================================================================
-	<T> void persist(String key, T value) {
+	<T> void putPref(String key, T value) {
 		AccessPreferences.put(this, key, value);
 	}
 
-	<T> T retrieve(String key, T value) {
+	<T> T getPref(String key, T value) {
 		return AccessPreferences.get(this, key, value);
 	}
 

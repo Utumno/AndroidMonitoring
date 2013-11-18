@@ -11,9 +11,12 @@ import android.net.wifi.WifiManager;
 import android.os.Bundle;
 import android.provider.Settings;
 
+import gr.uoa.di.monitoring.android.R;
 import gr.uoa.di.monitoring.android.activities.DialogActivity;
+import gr.uoa.di.monitoring.android.activities.MonitorActivity;
 import gr.uoa.di.monitoring.android.receivers.BaseReceiver;
 import gr.uoa.di.monitoring.android.receivers.LocationReceiver;
+import gr.uoa.di.monitoring.model.ParserException;
 import gr.uoa.di.monitoring.model.Position;
 
 import java.io.FileNotFoundException;
@@ -28,7 +31,7 @@ import static gr.uoa.di.monitoring.android.C.NOT_USED;
 import static gr.uoa.di.monitoring.android.C.ac_aborting;
 import static gr.uoa.di.monitoring.android.C.ac_location_data;
 import static gr.uoa.di.monitoring.android.C.launchSettingsIntent;
-import static gr.uoa.di.monitoring.android.C.triggerNotification;
+import static gr.uoa.di.monitoring.android.C.triggerDialogNotification;
 
 public final class LocationMonitor extends Monitor<Location, Position> {
 
@@ -40,8 +43,9 @@ public final class LocationMonitor extends Monitor<Location, Position> {
 	public static final String NOTIFICATION_TAG = LocationMonitor.class
 			.getSimpleName() + ".Notification";
 	private static final int NOTIFICATION_ID = 9200;
+	private static final String LOCATION_DATA_KEY = "LOCATION_DATA_KEY";
 	// convenience fields
-	private static LocationManager lm; // not final cause we need a f*ng context
+	private static volatile LocationManager lm; // not final - we need a context
 	// members
 	private static PendingIntent pi; // see above
 	private Providers.Status providerStatus;
@@ -75,7 +79,8 @@ public final class LocationMonitor extends Monitor<Location, Position> {
 		final CharSequence action = intent.getAction();
 		if (action == null) {
 			// monitor command from the alarm manager
-			final String provider = Providers.getProvider(this);
+			// cancelNotification(this, NOTIFICATION_TAG, NOTIFICATION_ID);
+			final String provider = Providers.getProvider(lm());
 			providerStatus = Providers.getProviderStatus(this, provider);
 			if (providerStatus.notAvailabe()) {
 				sb.append(" (" + provider + ") ");
@@ -139,12 +144,23 @@ public final class LocationMonitor extends Monitor<Location, Position> {
 	}
 
 	private LocationManager lm() {
-		if (lm == null) {
-			lm = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
+		LocationManager result = lm;
+		if (result == null) {
+			synchronized (LocationManager.class) {
+				result = lm;
+				if (result == null)
+					result = lm = (LocationManager) getSystemService(
+						Context.LOCATION_SERVICE);
+			}
 		}
-		return lm;
+		return result;
 	}
 
+	// // Lazy initialization holder class idiom for static fields
+	// private static class FieldHolder {
+	// static final FieldType field = computeFieldValue();
+	// }
+	// static FieldType getField() { return FieldHolder.field; }
 	/**
 	 * Provides the providers - wrapper around the LocationManager provider
 	 * facilities. Includes our Criteria and defines our policies
@@ -155,7 +171,6 @@ public final class LocationMonitor extends Monitor<Location, Position> {
 
 		private Providers() {}
 
-		// private static Context daFrigginCtx;
 		private final static Criteria CRITERIA;
 		static {
 			CRITERIA = new Criteria();
@@ -172,12 +187,12 @@ public final class LocationMonitor extends Monitor<Location, Position> {
 			CRITERIA.setSpeedRequired(false);
 		}
 
-		private static String getProvider(final LocationMonitor m) {
-			return m.lm().getBestProvider(CRITERIA, ENABLE);
+		static String getProvider(final LocationManager m) {
+			return m.getBestProvider(CRITERIA, ENABLE);
 		}
 
-		private static Status getProviderStatus(Context ctx, String s) {
-			if (s.equals(null)) return Status.NULL;
+		static Status getProviderStatus(Context ctx, String s) {
+			if (s == null) return Status.NULL;
 			if (s.equals(LocationManager.GPS_PROVIDER)) return Status.GPS;
 			if (s.equals(LocationManager.NETWORK_PROVIDER)) {
 				// Check if wireless is enabled
@@ -200,106 +215,86 @@ public final class LocationMonitor extends Monitor<Location, Position> {
 			return Status.UNKNOWN_PROVIDER;
 		}
 
-		@SuppressWarnings("unused")
-		private static void launchDialog(Context ctx, Status stat) {
-			DialogActivity.launchDialogActivity(ctx, stat.title(),
-				stat.notification(), stat.launchIntent());
-		}
-
-		private static void launchNotification(Context ctx, Status stat) {
+		static void launchNotification(Context ctx, Status stat) {
 			Intent intent = DialogActivity.launchDialogActivityIntent(ctx,
-				stat.title(), stat.dialog(), stat.launchIntent());
+				stat.title(ctx), stat.dialog(ctx), stat.launchIntent());
 			// intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK); // nope
-			triggerNotification(ctx, stat.title(), stat.notification(), intent,
-				NOTIFICATION_TAG, NOTIFICATION_ID);
+			triggerDialogNotification(ctx, stat.title(ctx), stat.notification(ctx),
+				intent, NOTIFICATION_TAG, NOTIFICATION_ID);
 		}
 
 		@SuppressWarnings("unused")
-		private static String allProviders(LocationMonitor m) {
-			return Arrays.toString(m.lm().getAllProviders().toArray());
+		private static String allProviders(LocationManager m) {
+			return Arrays.toString(m.getAllProviders().toArray());
 		}
 
 		private enum Status {
+			// TODO : add a constant on gps status GPS_NO_FIX
 			GPS, NETWORK, NETWORK_NOT_ENABLED, NETWORK_NOT_CONNECTED, NULL,
 			UNKNOWN_PROVIDER;
 
-			// TODO : add a constant on gps status GPS_NO_FIX
-			// FIXME : move messages to resources
-			//
-			private String title() {
+			String title(Context ctx) {
 				switch (this) {
 				case NULL:
-					return "Enable location tracking";
+					return ctx.getString(R.string.title_null);
 				case NETWORK_NOT_CONNECTED:
-					return "Connect to a network";
+					return ctx.getString(R.string.title_network_not_connected);
 				case GPS:
-					return "GPS location";
+					return ctx.getString(R.string.title_gps);
 				case NETWORK:
-					return "Network location";
+					return ctx.getString(R.string.title_network);
 				case UNKNOWN_PROVIDER:
-					return "Unknown location provider";
+					return ctx.getString(R.string.title_unknown_provider);
 				case NETWORK_NOT_ENABLED:
-					return "Switch wifi or GPS on";
+					return ctx.getString(R.string.title_network_not_enabled);
 				}
-				throw new IllegalStateException("Forgotten enum constant");
+				throw new AssertionError("Forgotten enum constant");
 			}
 
-			private String notification() {
+			String notification(Context ctx) {
 				switch (this) {
 				case NULL:
-					return "No location services. Monitoring has stopped.";
+					return ctx.getString(R.string.notification_null);
 				case NETWORK_NOT_CONNECTED:
-					return "No wireless connection. Monitoring has stopped.";
-				case NETWORK_NOT_ENABLED:
-					return "No network/gps open. Monitoring has stopped.";
+					return ctx
+							.getString(R.string.notification_network_not_connected);
 				case GPS:
-					return "Location is provided by GPS. That is the best "
-						+ "option for monitoring the location if outdoors. "
-						+ "Please if indoors connect to a wireless network\n";
+					return ctx.getString(R.string.notification_gps);
 				case NETWORK:
-					return "Location is provided by your wireless connection. "
-						+ "That is the best option for monitoring the location"
-						+ " if indoors. Please consider connecting to the GPS "
-						+ "provider while outdoors\n";
+					return ctx.getString(R.string.notification_network);
 				case UNKNOWN_PROVIDER:
-					return "No known location services. Monitoring has "
-						+ "stopped.";
+					return ctx
+							.getString(R.string.notification_unknown_provider);
+				case NETWORK_NOT_ENABLED:
+					return ctx
+							.getString(R.string.notification_network_not_enabled);
 				}
-				throw new IllegalStateException("Forgotten enum constant");
+				throw new AssertionError("Forgotten enum constant");
 			}
 
-			private String dialog() {
+			String dialog(Context ctx) {
+				return ctx.getString(dialog());
+			}
+
+			private int dialog() {
 				switch (this) {
 				case NULL:
-					return "Your location services are disabled. "
-						+ "Monitoring has stopped. Would you like to enable "
-						+ "them and restart monitoring ?\n";
+					return R.string.dialog_null;
 				case NETWORK_NOT_CONNECTED:
-					return "You are not connected to a wireless network. "
-						+ "Monitoring has stopped. Would you like to connect  "
-						+ "a network and restart monitoring ?\n";
+					return R.string.dialog_network_not_connected;
 				case NETWORK_NOT_ENABLED:
-					return "You must enable wifi (or preferably GPS if you "
-						+ "are outdoors). Monitoring has stopped.  Would you "
-						+ "like to enable wifi and restart monitoring ?\n";
+					return R.string.dialog_network_not_enabled;
 				case GPS:
-					return "Location is provided by GPS. That is the best "
-						+ "option for monitoring the location if outdoors. "
-						+ "Please if indoors connect to a wireless network\n";
+					return R.string.dialog_gps;
 				case NETWORK:
-					return "Location is provided by your wireless connection. "
-						+ "That is the best option for monitoring the location"
-						+ " if outdoors. Please consider connecting to the GPS "
-						+ "provider while outdoors\n";
+					return R.string.dialog_network;
 				case UNKNOWN_PROVIDER:
-					return "Your location services are new to us. "
-						+ "Monitoring has stopped. Please enable GPS or if "
-						+ "indoors connect to a wireless network\n";
+					return R.string.dialog_unknown_provider;
 				}
-				throw new IllegalStateException("Forgotten enum constant");
+				throw new AssertionError("Forgotten enum constant");
 			}
 
-			private Intent launchIntent() {
+			Intent launchIntent() {
 				switch (this) {
 				case NULL:
 				case UNKNOWN_PROVIDER:
@@ -311,10 +306,10 @@ public final class LocationMonitor extends Monitor<Location, Position> {
 				case NETWORK:
 					return null;
 				}
-				throw new IllegalStateException("Forgotten enum constant");
+				throw new AssertionError("Forgotten enum constant");
 			}
 
-			private boolean notAvailabe() {
+			boolean notAvailabe() {
 				return !(this == GPS || this == NETWORK);
 			}
 		}
@@ -331,5 +326,22 @@ public final class LocationMonitor extends Monitor<Location, Position> {
 		List<byte[]> listByteArrays = Position.LocationFields
 				.createListOfByteArrays(data);
 		Position.saveData(this, listByteArrays);
+		try {
+			final String string = Position.fromBytes(listByteArrays).toString();
+			putPref(LOCATION_DATA_KEY, string);
+			runOnUiThread(new Runnable() {
+
+				@Override
+				public void run() {
+					MonitorActivity.onChange(LocationMonitor.this);
+				}
+			});
+		} catch (ParserException e) {
+			w("Corrupted data", e);
+		}
+	}
+
+	public static String dataKey() {
+		return LOCATION_DATA_KEY;
 	}
 }

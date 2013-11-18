@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+	<string name="title_battery_low_notification">Battery Low</string>
+	<string name="body_battery_low_notification">Monitoring aborted. Please reenable when battery is charged</string>
+</resources>

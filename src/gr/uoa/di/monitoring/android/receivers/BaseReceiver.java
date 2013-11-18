@@ -10,7 +10,7 @@ import gr.uoa.di.monitoring.android.Logging;
 
 public abstract class BaseReceiver extends BroadcastReceiver implements Logging {
 
-	protected final static String TAG = BaseReceiver.class.getSimpleName();
+	final static String TAG = BaseReceiver.class.getSimpleName();
 	private final String tag_ = this.getClass().getSimpleName();
 
 	/**

@@ -7,6 +7,7 @@ import android.app.PendingIntent;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
+import android.provider.Settings;
 import android.support.v4.app.NotificationCompat;
 import android.util.Log;
 
@@ -25,8 +26,11 @@ import java.io.IOException;
 public final class C {
 
 	public static final String APP_PACKAGE_NAME = C.class.getPackage()
-			.toString().split(" ")[1];
+		.toString().split(" ")[1];
 	public static final int UNDEFINED = -1;
+	// used by fragments and monitor activity
+	public final static String DATA_PREFS_KEY_INTENT_KEY = "DATA_PREFS_KEY_INTENT_KEY";
+	public final static String DATA_INTRO_INTENT_KEY = "DATA_INTRO_KEY";
 	// ACTIONS
 	private static final CharSequence ACTION_PREFIX = "gr.uoa.di.monitoring.android.intent.action.";
 	public static final CharSequence ac_setup_alarm = ACTION_PREFIX
@@ -40,8 +44,6 @@ public final class C {
 		+ "SCAN_WIFI_DISABLED";
 	public static final CharSequence ac_scan_wifi_enabled = ACTION_PREFIX
 		+ "SCAN_WIFI_ENABLED";
-	public static final CharSequence ac_location_update = ACTION_PREFIX
-		+ "LOCATION_UPDATE";
 	public static final CharSequence ac_location_data = ACTION_PREFIX
 		+ "LOCATION_DATA";
 	public static final CharSequence ac_aborting = ACTION_PREFIX + "ABORTING";
@@ -68,8 +70,18 @@ public final class C {
 		return FileIO.fileExternalPublicStorage(LOG_DIR, LOG_FILE, null);
 	}
 
-	// TODO : docs/test
+	/**
+	 * Returns an intent which can be used to launch a Settings activity
+	 *
+	 * @param action
+	 *            only tested with Settings.ACTION_XXX_SETTINGS actions
+	 * @return an intent used to fire the settings screen
+	 * @throws NullPointerException
+	 *             if action is null
+	 */
 	public static Intent launchSettingsIntent(final String action) {
+		if (action == null)
+			throw new NullPointerException("Action can't be null");
 		// see http://stackoverflow.com/a/7024631/281545
 		// and http://stackoverflow.com/a/13385550/281545 for
 		// FLAG_ACTIVITY_NEW_TASK
@@ -78,15 +90,30 @@ public final class C {
 		final Intent i = new Intent(action);
 		// i.addCategory(Intent.CATEGORY_LAUNCHER);
 		// i.setComponent(gps);
-		i.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK); // TODO : needed ?
+		// i.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
 		return i;
 	}
 
-	// TODO : docs/test & understand what the flags do/are needed etc
-	// especially to stop having my app's task brought to foreground with the
+	/**
+	 * Returns an intent which can be used to launch an activity
+	 *
+	 * @param ctx
+	 *            a Context from which the actual package name will be retrieved
+	 *            (from docs of
+	 *            {@link ComponentName#ComponentName(Context, Class)}
+	 * @param cls
+	 *            the class of the activity to be launched
+	 * @return an intent used to fire the specified activity
+	 * @throws NullPointerException
+	 *             if any parameter is null
+	 */
+	// TODO : stop having my app's stack brought to foreground with the
 	// DialogActivity
 	public static Intent launchActivityIntent(Context ctx,
 			final Class<? extends Activity> cls) {
+		if (ctx == null || cls == null)
+			throw new NullPointerException(
+				"Parameters in launchActivityIntent() can't be null");
 		final ComponentName toLaunch = new ComponentName(ctx, cls);
 		final Intent i = new Intent();
 		// i.addCategory(Intent.CATEGORY_LAUNCHER);
@@ -95,26 +122,104 @@ public final class C {
 		return i;
 	}
 
-	// TODO : docs/test & understand what the flags do/are needed etc
-	public static void triggerNotification(Context context, CharSequence title,
-			CharSequence message, Intent intent, String tag, int id) {
+	/**
+	 * Trigger a notification that when clicked launches a dialog activity which
+	 * will launch the specified intent on "Yes"
+	 *
+	 * @param context
+	 *            needed to retrieve the NotificationManager System service and
+	 *            register the pending intent
+	 * @param title
+	 * @param message
+	 * @param intent
+	 *            the intent for the activity to launch - tested with
+	 *            {@link #launchActivityIntent}
+	 * @param tag
+	 * @param id
+	 */
+	public static void triggerDialogNotification(Context context,
+			CharSequence title, CharSequence message, Intent intent,
+			String tag, int id) {
 		PendingIntent pi = PendingIntent.getActivity(context, NOT_USED, intent,
 			PendingIntent.FLAG_UPDATE_CURRENT); // FLAG_UPDATE_CURRENT?
 		Notification not = new NotificationCompat.Builder(context)
-				.setContentTitle(title).setContentText(message)
-				.setContentIntent(pi)
-				// this ^^^ must be set in my API (2.3.7) version otherwise I
-				// get IllegalArgumentException: contentIntent required
-				.setAutoCancel(true) // cancel on click
-				.setSmallIcon(R.drawable.ic_launcher) // TODO : icons
-				// had android.R.drawable.stat_notify_error
-				// .setDefaults(Notification.DEFAULT_ALL) // needs permissions
-				// .setOngoing(ONGOING) // not needed apparently
-				// .setLargeIcon(aBitmap)
-				.build();
+			.setContentTitle(title).setContentText(message)
+			.setContentIntent(pi)
+			// this ^^^ must be set in my API (2.3.7) version otherwise I
+			// get IllegalArgumentException: contentIntent required
+			.setAutoCancel(true) // cancel on click
+			.setSmallIcon(R.drawable.ic_launcher) // TODO : icons
+			// had android.R.drawable.stat_notify_error
+			// .setDefaults(Notification.DEFAULT_ALL) // needs permissions
+			// .setOngoing(ONGOING) // not needed apparently
+			// .setLargeIcon(aBitmap)
+			.build();
 		NotificationManager notificationManager = (NotificationManager) context
-				.getSystemService(Context.NOTIFICATION_SERVICE);
+			.getSystemService(Context.NOTIFICATION_SERVICE);
 		notificationManager.notify(tag, id, not);
+	}
+
+	/**
+	 * Trigger a notification that when clicked is dismissed
+	 *
+	 * @param ctx
+	 *            needed to retrieve the NotificationManager System service and
+	 *            register the pending intent
+	 * @param title
+	 * @param message
+	 * @param tag
+	 * @param id
+	 */
+	public static void triggerNotification(Context ctx, CharSequence title,
+			CharSequence message, String tag, int id) {
+		final Intent emptyIntent = new Intent(); // can't get rid as it's needed
+		// for PendingIntent.getActivity
+		PendingIntent pi = PendingIntent.getActivity(ctx, NOT_USED,
+			emptyIntent, PendingIntent.FLAG_UPDATE_CURRENT); // FLAG_UPDATE_CURRENT?
+		Notification not = new NotificationCompat.Builder(ctx)
+			.setContentTitle(title).setContentText(message)
+			.setContentIntent(pi)
+			// this ^^^ must be set in my API (2.3.7) version otherwise I
+			// get IllegalArgumentException: contentIntent required
+			.setAutoCancel(true) // cancel on click
+			.setSmallIcon(R.drawable.ic_launcher) // TODO : icons
+			// had android.R.drawable.stat_notify_error
+			// .setDefaults(Notification.DEFAULT_ALL) // needs permissions
+			// .setOngoing(ONGOING) // not needed apparently
+			// .setLargeIcon(aBitmap)
+			.build();
+		NotificationManager notificationManager = (NotificationManager) ctx
+			.getSystemService(Context.NOTIFICATION_SERVICE);
+		notificationManager.notify(tag, id, not);
+	}
+
+	public static void triggerTestNotification(Context ctx, String tag, int id) {
+		// see http://stackoverflow.com/questions/20032249/
+		// is-setcontentintentpendingintent-required-in-notificationcompat-builder
+		final Intent emptyIntent = new Intent(Settings.ACTION_WIFI_SETTINGS);
+		// emptyIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK); //not needed
+		// methinks
+		PendingIntent pi = PendingIntent.getActivity(ctx, NOT_USED,
+			emptyIntent, PendingIntent.FLAG_UPDATE_CURRENT);
+		Notification not = new NotificationCompat.Builder(ctx)
+			.setContentTitle("Title").setContentText("Launch wifi settings")
+			.setAutoCancel(true) // cancel on click
+			.setSmallIcon(R.drawable.ic_launcher).setContentIntent(pi).build();
+		NotificationManager notificationManager = (NotificationManager) ctx
+			.getSystemService(Context.NOTIFICATION_SERVICE);
+		notificationManager.notify(tag, id, not);
+	}
+
+	public static void cancelNotification(Context ctx, String tag, int id) {
+		NotificationManager notificationManager = (NotificationManager) ctx
+			.getSystemService(Context.NOTIFICATION_SERVICE);
+		notificationManager.cancel(tag, id);
+	}
+
+	public static void cancelAllNotifications(Context ctx) {
+		NotificationManager notificationManager = (NotificationManager) ctx
+			.getSystemService(Context.NOTIFICATION_SERVICE);
+		notificationManager.cancelAll();
 	}
 
 	// =========================================================================

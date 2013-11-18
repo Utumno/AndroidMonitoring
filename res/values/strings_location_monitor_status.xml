@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+	<string name="title_null">Enable location tracking</string>
+	<string name="title_network_not_connected">Connect to a network</string>
+	<string name="title_gps">GPS location</string>
+	<string name="title_network">Network location</string>
+	<string name="title_unknown_provider">Unknown location provider</string>
+	<string name="title_network_not_enabled">Switch wifi or GPS on</string>
+	<string name="notification_null">No location services. Monitoring has stopped.</string>
+	<string name="notification_network_not_connected">No wireless connection. Monitoring has stopped.</string>
+	<string name="notification_network_not_enabled">No network/gps open. Monitoring has stopped.</string>
+	<string name="notification_gps">Location is provided by GPS. That is the best option for monitoring the location if outdoors. Please if indoors connect to a wireless network\n</string>
+	<string name="notification_network">Location is provided by your wireless connection. That is the best option for monitoring the location if indoors. Please consider connecting to the GPS provider while outdoors\n</string>
+	<string name="notification_unknown_provider">No known location services. Monitoring has stopped.</string>
+	<string name="dialog_null">Your location services are disabled. Monitoring has stopped. Would you like to enable them and restart monitoring ?\n</string>
+	<string name="dialog_network_not_connected">You are not connected to a wireless network. Monitoring has stopped. Would you like to connect  a network and restart monitoring ?\n</string>
+	<string name="dialog_network_not_enabled">You must enable wifi (or preferably GPS if you are outdoors). Monitoring has stopped.  Would you like to enable wifi and restart monitoring ?\n</string>
+	<string name="dialog_gps">Location is provided by GPS. That is the best option for monitoring the location if outdoors. Please if indoors connect to a wireless network\n</string>
+	<string name="dialog_network">Location is provided by your wireless connection. That is the best option for monitoring the location if outdoors. Please consider connecting to the GPS provider while outdoors\n</string>
+	<string name="dialog_unknown_provider">Your location services are new to us. Monitoring has stopped. Please enable GPS or if indoors connect to a wireless network\n</string>
+</resources>

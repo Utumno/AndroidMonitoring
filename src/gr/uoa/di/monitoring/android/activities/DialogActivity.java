@@ -1,5 +1,6 @@
 package gr.uoa.di.monitoring.android.activities;
 
+import android.content.ActivityNotFoundException;
 import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
@@ -76,7 +77,15 @@ public class DialogActivity extends BaseActivity implements OnClickListener {
 	public void onClick(View v) {
 		switch (v.getId()) {
 		case R.id.dialog_activity_yes_button:
-			DialogActivity.this.startActivity(mIntent);
+			try {
+				DialogActivity.this.startActivity(mIntent);
+			} catch (ActivityNotFoundException e) {
+				// see http://stackoverflow.com/questions/20018082/
+				// safeguard-against-a-matching-activity-may-not-exist
+				// -in-android-settings
+				w("The activity was not found" + e.getMessage());
+				// not much can be done - maybe display a toast...
+			}
 			finish(); // TODO : launch another activity (my Settings activity)
 			// check CATEGORY_PREFERENCE ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 			break;
@@ -84,13 +93,6 @@ public class DialogActivity extends BaseActivity implements OnClickListener {
 			finish();
 			break;
 		}
-	}
-
-	public static void launchDialogActivity(Context ctx, final String title,
-			final String text, final Intent intentToLaunchOnYes) {
-		final Intent i = launchDialogActivityIntent(ctx, title, text,
-			intentToLaunchOnYes);
-		ctx.startActivity(i);
 	}
 
 	public static Intent launchDialogActivityIntent(Context ctx,
@@ -105,4 +107,11 @@ public class DialogActivity extends BaseActivity implements OnClickListener {
 		i.putExtras(extras);
 		return i;
 	}
+	// directly launches a Dialog Activity
+	// public static void launchDialogActivity(Context ctx, final String title,
+	// final String text, final Intent intentToLaunchOnYes) {
+	// final Intent i = launchDialogActivityIntent(ctx, title, text,
+	// intentToLaunchOnYes);
+	// ctx.startActivity(i);
+	// }
 }

@@ -1,0 +1,6 @@
+<resources>
+	<string name="default_data_updating">Updating &#8230;</string>
+	<string name="battery_intro">The status of the battery is:\n</string>
+	<string name="wifi_intro">The available networks are:\n</string>
+	<string name="location_intro">The current location is:\n</string>
+</resources>

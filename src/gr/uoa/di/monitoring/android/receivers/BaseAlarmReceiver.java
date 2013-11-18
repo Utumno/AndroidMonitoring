@@ -10,7 +10,6 @@ import android.os.SystemClock;
 import com.commonsware.cwac.wakeful.WakefulIntentService;
 
 import gr.uoa.di.monitoring.android.services.AlarmService;
-import gr.uoa.di.monitoring.android.services.Monitor;
 
 import static gr.uoa.di.monitoring.android.C.ac_aborting;
 import static gr.uoa.di.monitoring.android.C.ac_cancel_alarm;
@@ -71,7 +70,8 @@ public abstract class BaseAlarmReceiver extends BaseReceiver {
 		if (setup) {
 			try {
 				am.setInexactRepeating(AlarmManager.ELAPSED_REALTIME_WAKEUP,
-					SystemClock.elapsedRealtime() + Monitor.getInitialDelay(),
+					SystemClock.elapsedRealtime()
+						+ AlarmService.getInitialDelay(),
 					monitor_class_.newInstance().getInterval(), pi);
 			} catch (InstantiationException e) {
 				// should not happen

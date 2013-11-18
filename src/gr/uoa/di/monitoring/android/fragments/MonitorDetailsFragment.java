@@ -5,12 +5,14 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 
+import gr.uoa.di.monitoring.android.R;
+
 public class MonitorDetailsFragment extends BaseFragment {
 
 	@Override
 	public View onCreateView(LayoutInflater inflater, ViewGroup container,
 			Bundle savedInstanceState) {
-		int layout = intent.getIntExtra("DETAILS_LAYOUT", UNDEFINED);
-		return inflater.inflate(layout, container, false); // NEVER TRUE !
+		final int LAYOUT = R.layout.data_display;
+		return inflater.inflate(LAYOUT, container, false); // NEVER TRUE !
 	}
 }

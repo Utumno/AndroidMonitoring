@@ -47,6 +47,15 @@
                 <action android:name="com.htc.intent.action.QUICKBOOT_POWERON" />
             </intent-filter>
         </receiver>
+		<receiver
+			android:name=".receivers.BatteryLowReceiver"
+			android:enabled="false" >
+			<intent-filter>
+				<action android:name="android.intent.action.BATTERY_LOW" />
+				<!-- http://code.google.com/p/android/issues/detail?id=36712 -->
+				<!-- <action android:name="android.intent.action.BATTERY_OKAY" /> -->
+			</intent-filter>
+		</receiver>
         <receiver
             android:name=".receivers.BatteryMonitoringReceiver"
             android:enabled="false" >

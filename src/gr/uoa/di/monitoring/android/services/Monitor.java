@@ -3,11 +3,15 @@ package gr.uoa.di.monitoring.android.services;
 import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
 
+import gr.uoa.di.android.helpers.AccessPreferences;
 import gr.uoa.di.monitoring.android.R;
 import gr.uoa.di.monitoring.android.receivers.BaseAlarmReceiver;
 import gr.uoa.di.monitoring.android.receivers.BaseReceiver;
+import gr.uoa.di.monitoring.android.receivers.BatteryLowReceiver;
 import gr.uoa.di.monitoring.android.receivers.BatteryMonitoringReceiver;
 import gr.uoa.di.monitoring.android.receivers.LocationMonitoringReceiver;
 import gr.uoa.di.monitoring.android.receivers.NetworkReceiver;
@@ -23,6 +27,7 @@ import java.util.List;
 import static gr.uoa.di.monitoring.android.C.DISABLE;
 import static gr.uoa.di.monitoring.android.C.ac_cancel_alarm;
 import static gr.uoa.di.monitoring.android.C.ac_setup_alarm;
+import static gr.uoa.di.monitoring.android.C.cancelAllNotifications;
 
 public abstract class Monitor<K, Y extends Data> extends AlarmService {
 
@@ -32,6 +37,7 @@ public abstract class Monitor<K, Y extends Data> extends AlarmService {
 	private static final List<Class<? extends BaseAlarmReceiver>> SETUP_ALARM_RECEIVERS = new ArrayList<Class<? extends BaseAlarmReceiver>>();
 	// subclasses fields - subclasses are final so those have default scope
 	/** Delimiter used to separate the items in debug prints */
+	private Handler handler;
 	static final String DEBUG_DELIMITER = "::";
 	static {
 		SETUP_ALARM_RECEIVERS.add(BatteryMonitoringReceiver.class);
@@ -40,12 +46,19 @@ public abstract class Monitor<K, Y extends Data> extends AlarmService {
 		SETUP_ALARM_RECEIVERS.add(NetworkReceiver.class);
 		RECEIVERS.addAll(SETUP_ALARM_RECEIVERS);
 		RECEIVERS.add(TriggerMonitoringBootReceiver.class);
+		RECEIVERS.add(BatteryLowReceiver.class); // TODO : separate treatment
 	}
+
 
 	public Monitor(String name) {
 		super(name);
 	}
 
+	@Override
+	public void onCreate() {
+		super.onCreate();
+		handler = new Handler(Looper.getMainLooper());
+	}
 	// =========================================================================
 	// Abstract methods
 	// =========================================================================
@@ -74,17 +87,35 @@ public abstract class Monitor<K, Y extends Data> extends AlarmService {
 		if (enable) {
 			_enableDisableReceivers(ctx, enable);
 			_setupCancelAlarms(ctx, enable);
+			cancelAllNotifications(ctx); // maybe not the network service one
 		} else {
 			_setupCancelAlarms(ctx, enable);
 			_enableDisableReceivers(ctx, enable);
 		}
 	}
 
+	/**
+	 * Disables monitoring and sets the preference to false
+	 *
+	 * @param ctx
+	 */
+	public static void abort(Context ctx) {
+		synchronized (Monitor.class) {
+			String master_enable = ctx.getResources()
+				.getText(R.string.enable_monitoring_master_pref_key).toString();
+			if (!AccessPreferences.get(ctx, master_enable, DISABLE)) return; // already
+																				// disabled
+			AccessPreferences.put(ctx, master_enable, DISABLE);
+			enableMonitoring(ctx, DISABLE);
+		}
+	}
+
+	// API helpers
 	private static void _setupCancelAlarms(Context ctx, boolean enable) {
 		for (Class<? extends BaseAlarmReceiver> sEClass : SETUP_ALARM_RECEIVERS) {
 			Intent i = new Intent(""
 				+ (enable ? ac_setup_alarm : ac_cancel_alarm), Uri.EMPTY, ctx,
-					sEClass);
+				sEClass);
 			Log.d(TAG, "setup/cancel alarms int : " + i);
 			ctx.sendBroadcast(i);
 		}
@@ -120,12 +151,13 @@ public abstract class Monitor<K, Y extends Data> extends AlarmService {
 		return false;
 	}
 
+	/** Disables monitoring and sets the preference to false */
 	void abort() {
 		synchronized (Monitor.class) {
 			String master_enable = getResources().getText(
 				R.string.enable_monitoring_master_pref_key).toString();
-			if (!retrieve(master_enable, DISABLE)) return; // already disabled
-			persist(master_enable, DISABLE);
+			if (!getPref(master_enable, DISABLE)) return; // already disabled
+			putPref(master_enable, DISABLE);
 			enableMonitoring(this, DISABLE);
 		}
 	}
@@ -143,35 +175,8 @@ public abstract class Monitor<K, Y extends Data> extends AlarmService {
 		sb.append(DEBUG_DELIMITER);
 		return sb;
 	}
-}
 
-enum MonitoringInterval {
-	FIVE(5), SIX(6), TEN(10), TWELVE(12), FIFTEEN(15), TWENTY(20),
-	HALF_HOUR(30), HOUR(60);
-
-	private final long interval;
-
-	MonitoringInterval(long interval) {
-		this.interval = interval;
-	}
-
-	public long getInterval() {
-		return interval;
-	}
-
-	static MonitoringInterval lessOften(MonitoringInterval mi) {
-		int ordinal = mi.ordinal();
-		if (ordinal < values().length - 1) {
-			++ordinal;
-		}
-		return values()[ordinal];
-	}
-
-	static MonitoringInterval moreOften(MonitoringInterval mi) {
-		int ordinal = mi.ordinal();
-		if (ordinal > 0) {
-			--ordinal;
-		}
-		return values()[ordinal];
+	void runOnUiThread(Runnable runnable) {
+		handler.post(runnable);
 	}
 }

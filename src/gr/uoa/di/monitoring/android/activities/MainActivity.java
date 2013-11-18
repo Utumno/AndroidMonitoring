@@ -10,18 +10,19 @@ import android.view.View.OnClickListener;
 
 import com.commonsware.cwac.wakeful.WakefulIntentService;
 
-import gr.uoa.di.android.helpers.Net;
 import gr.uoa.di.monitoring.android.R;
+import gr.uoa.di.monitoring.android.services.BatteryMonitor;
+import gr.uoa.di.monitoring.android.services.LocationMonitor;
 import gr.uoa.di.monitoring.android.services.NetworkService;
+import gr.uoa.di.monitoring.android.services.WifiMonitor;
 
-import java.net.SocketException;
+import static gr.uoa.di.monitoring.android.C.DATA_INTRO_INTENT_KEY;
+import static gr.uoa.di.monitoring.android.C.DATA_PREFS_KEY_INTENT_KEY;
 
 public class MainActivity extends BaseActivity implements OnClickListener {
 
-	private int detailsLayout = UNDEFINED;
-	private int prefsLayout = UNDEFINED;
-	private final static String DETAILS_LAYOUT = "DETAILS_LAYOUT";
-	private final static String PREFS_LAYOUT = "PREFS_LAYOUT";
+	private String dataKey;
+	private String dataIntroString;
 	private final static int[] BUTTONS = { R.id.battery_button,
 			R.id.gps_button, R.id.wifi_button };
 
@@ -34,12 +35,6 @@ public class MainActivity extends BaseActivity implements OnClickListener {
 		for (int button : BUTTONS) {
 			findViewById(button).setOnClickListener(this);
 		}
-		// TODO : get rid of these
-		try {
-			w("IP : " + Net.getIPAddress(true));
-		} catch (SocketException e) {}
-		WakefulIntentService.sendWakefulWork(this, NetworkService.class);
-		// end todo
 		// String msg = null;
 		// if (android.os.Build.VERSION.SDK_INT >=
 		// Build.VERSION_CODES.HONEYCOMB) {
@@ -48,6 +43,9 @@ public class MainActivity extends BaseActivity implements OnClickListener {
 		// + Environment.isExternalStorageEmulated();
 		// }
 		PackageInfo pInfo = packageInfo();
+		// triggerTestNotification(this, this.getClass().getSimpleName()
+		// + ".NOTIFICATION", 0);
+		v("Kernel: " + System.getProperty("os.version"));
 		v("On create finished (" + pInfo.versionCode + ")");
 		// SharedPreferences p = PreferenceManager
 		// .getDefaultSharedPreferences(this);
@@ -87,25 +85,21 @@ public class MainActivity extends BaseActivity implements OnClickListener {
 	public void onClick(View v) {
 		switch (v.getId()) {
 		case R.id.battery_button:
-			detailsLayout = R.layout.battery_details;
-			prefsLayout = R.layout.battery_prefs;
+			dataKey = BatteryMonitor.dataKey();
+			dataIntroString = getString(R.string.battery_intro);
 			break;
 		case R.id.gps_button:
-			return;
-			// break;
+			dataKey = LocationMonitor.dataKey();
+			dataIntroString = getString(R.string.location_intro);
+			break;
 		case R.id.wifi_button:
-			return;
-			// break;
+			dataKey = WifiMonitor.dataKey();
+			dataIntroString = getString(R.string.wifi_intro);
+			break;
 		}
 		Intent intent = new Intent(this, MonitorActivity.class);
-		intent.putExtra(DETAILS_LAYOUT, detailsLayout);
-		intent.putExtra(PREFS_LAYOUT, prefsLayout);
+		intent.putExtra(DATA_PREFS_KEY_INTENT_KEY, dataKey);
+		intent.putExtra(DATA_INTRO_INTENT_KEY, dataIntroString);
 		startActivity(intent);
-	}
-
-	@Override
-	protected void onPause() {
-		super.onPause();
-		detailsLayout = prefsLayout = UNDEFINED;
 	}
 }

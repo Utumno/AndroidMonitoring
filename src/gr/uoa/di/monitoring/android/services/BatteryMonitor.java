@@ -4,7 +4,9 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.os.BatteryManager;
 
+import gr.uoa.di.monitoring.android.activities.MonitorActivity;
 import gr.uoa.di.monitoring.model.Battery;
+import gr.uoa.di.monitoring.model.ParserException;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -12,13 +14,16 @@ import java.util.List;
 
 public final class BatteryMonitor extends Monitor<Intent, Battery> {
 
-	private static final long BATTERY_MONITORING_INTERVAL = 10 * 60 * 1000L;
+	private static final long BATTERY_MONITORING_INTERVAL = 1 * 60 * 1000L;
+	private static final String BATTERY_DATA_KEY = "BATTERY_DATA_KEY";
 
 	public BatteryMonitor() {
 		// needed for service instantiation by Android. See :
-		// http://stackoverflow.com/questions/6176255/why-do-i-get-an-instantiationexception-if-i-try-to-start-a-service
+		// http://stackoverflow.com/questions/6176255/
+		// why-do-i-get-an-instantiationexception-if-i-try-to-start-a-service
 		// also for "why" of the string parameter :
-		// http://stackoverflow.com/questions/8016145/understanding-the-mechanisms-of-intentservice
+		// http://stackoverflow.com/questions/8016145/
+		// understanding-the-mechanisms-of-intentservice
 		super(BatteryMonitor.class.getSimpleName());
 	}
 
@@ -26,7 +31,7 @@ public final class BatteryMonitor extends Monitor<Intent, Battery> {
 	protected void doWakefulWork(Intent arg0) {
 		StringBuilder sb = debugHeader();
 		final Intent batteryStatus = registerReceiver(null, new IntentFilter(
-				Intent.ACTION_BATTERY_CHANGED));
+			Intent.ACTION_BATTERY_CHANGED));
 		// set the default to -1 as per :
 		// http://developer.android.com/training/monitoring-device-state/battery-monitoring.html
 		sb.append(batteryStatus.getIntExtra(BatteryManager.EXTRA_LEVEL, -1));
@@ -47,7 +52,24 @@ public final class BatteryMonitor extends Monitor<Intent, Battery> {
 	@Override
 	void saveResults(Intent data) throws FileNotFoundException, IOException {
 		List<byte[]> listByteArrays = Battery.BatteryFields
-				.createListOfByteArrays(data);
+			.createListOfByteArrays(data);
 		Battery.saveData(this, listByteArrays);
+		try {
+			final String string = Battery.fromBytes(listByteArrays).toString();
+			putPref(BATTERY_DATA_KEY, string);
+			runOnUiThread(new Runnable() {
+
+				@Override
+				public void run() {
+					MonitorActivity.onChange(BatteryMonitor.this);
+				}
+			});
+		} catch (ParserException e) {
+			w("Corrupted data", e);
+		}
+	}
+
+	public static String dataKey() {
+		return BATTERY_DATA_KEY;
 	}
 }
