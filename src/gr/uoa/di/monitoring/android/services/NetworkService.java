@@ -1,5 +1,6 @@
 package gr.uoa.di.monitoring.android.services;
 
+import android.app.AlarmManager;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
@@ -12,9 +13,11 @@ import android.provider.Settings;
 
 import gr.uoa.di.android.helpers.FileIO;
 import gr.uoa.di.android.helpers.Net;
+import gr.uoa.di.monitoring.android.BuildConfig;
 import gr.uoa.di.monitoring.android.R;
 import gr.uoa.di.monitoring.android.activities.DialogActivity;
 import gr.uoa.di.monitoring.android.persist.Persist;
+import gr.uoa.di.monitoring.android.services.Monitor.MonitoringInterval;
 
 import java.io.File;
 import java.io.IOException;
@@ -33,8 +36,8 @@ import static gr.uoa.di.monitoring.android.C.triggerDialogNotification;
 // TODO : HttpClient (for Froyo and Eclair) - see relevant session
 public final class NetworkService extends AlarmService {
 
-	// AlarmManager.INTERVAL_HALF_DAY; // !!!
-	private static final long SEND_DATA_INTERVAL = 5 * 60 * 1000L;/* 60 * */
+	private static final long SEND_DATA_INTERVAL = (BuildConfig.DEBUG) ? MonitoringInterval.FIVE
+		.getInterval() : AlarmManager.INTERVAL_HALF_DAY;
 	private static final String NOTIFICATION_TAG = NetworkService.class
 		.getSimpleName() + ".Notification";
 	private static final int NOTIFICATION_ID = 9202;
@@ -87,7 +90,7 @@ public final class NetworkService extends AlarmService {
 					getString(R.string.title_enable_wifi),
 					getString(R.string.dialog_enable_wifi),
 					launchSettingsIntent(Settings.ACTION_WIFI_SETTINGS));
-				triggerDialogNotification(this,
+				triggerDialogNotification(this, NOTIFICATION_ID,
 					getString(R.string.title_enable_wifi),
 					getString(R.string.notification_enable_wifi), in,
 					NOTIFICATION_TAG, NOTIFICATION_ID);
@@ -195,6 +198,12 @@ public final class NetworkService extends AlarmService {
 	@Override
 	public long getInterval() {
 		return SEND_DATA_INTERVAL;
+	}
+
+	/** Always returns the same interval */
+	@Override
+	public long getCurrentInterval() {
+		return getInterval();
 	}
 
 	private HttpURLConnection connection(boolean isMultiPart, String boundary)

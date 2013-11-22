@@ -5,6 +5,8 @@ import android.content.Intent;
 import android.os.Bundle;
 import android.support.v4.app.FragmentActivity;
 import android.view.Menu;
+import android.view.View;
+import android.view.View.OnClickListener;
 import android.widget.TextView;
 
 import gr.uoa.di.android.helpers.AccessPreferences;
@@ -12,10 +14,13 @@ import gr.uoa.di.monitoring.android.R;
 
 import static gr.uoa.di.monitoring.android.C.DATA_INTRO_INTENT_KEY;
 import static gr.uoa.di.monitoring.android.C.DATA_PREFS_KEY_INTENT_KEY;
+import static gr.uoa.di.monitoring.android.C.START_SERVICE_INTENT_INTENT_KEY;
 
-public class MonitorActivity extends FragmentActivity {
+public class MonitorActivity extends FragmentActivity implements
+		OnClickListener {
 
 	private Intent monitorActivityIntent;
+	private static Intent serviceIntent;
 	private static TextView dataTextView;
 	private static String dataKey;
 	private static String defaultDataText;
@@ -32,11 +37,16 @@ public class MonitorActivity extends FragmentActivity {
 		introTextView.setText(introText);
 		// data
 		dataTextView = (TextView) findViewById(R.id.data);
-		dataKey = monitorActivityIntent.getStringExtra(DATA_PREFS_KEY_INTENT_KEY);
+		dataKey = monitorActivityIntent
+			.getStringExtra(DATA_PREFS_KEY_INTENT_KEY);
 		defaultDataText = getResources().getString(
 			R.string.default_data_updating);
 		dataTextView.setText(AccessPreferences.get(this, dataKey,
 			defaultDataText));
+		// button
+		findViewById(R.id.update_data_button).setOnClickListener(this);
+		serviceIntent = (Intent) monitorActivityIntent
+			.getParcelableExtra(START_SERVICE_INTENT_INTENT_KEY);
 	}
 
 	public static void onChange(Context ctx) {
@@ -50,5 +60,13 @@ public class MonitorActivity extends FragmentActivity {
 		// Inflate the menu; this adds items to the action bar if it is present.
 		getMenuInflater().inflate(R.menu.monitor, menu);
 		return true;
+	}
+
+	@Override
+	public void onClick(View v) {
+		switch (v.getId()) {
+		case R.id.update_data_button:
+			this.startService(serviceIntent);
+		}
 	}
 }

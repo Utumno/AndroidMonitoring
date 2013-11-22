@@ -15,6 +15,7 @@ import gr.uoa.di.monitoring.android.R;
 import gr.uoa.di.monitoring.android.activities.DialogActivity;
 import gr.uoa.di.monitoring.android.activities.MonitorActivity;
 import gr.uoa.di.monitoring.android.receivers.BaseReceiver;
+import gr.uoa.di.monitoring.android.receivers.LocationMonitoringReceiver;
 import gr.uoa.di.monitoring.android.receivers.LocationReceiver;
 import gr.uoa.di.monitoring.model.ParserException;
 import gr.uoa.di.monitoring.model.Position;
@@ -35,15 +36,18 @@ import static gr.uoa.di.monitoring.android.C.triggerDialogNotification;
 
 public final class LocationMonitor extends Monitor<Location, Position> {
 
-	private static final long LOCATION_MONITORING_INTERVAL = 2 * 60 * 1000L;
+	private static final long LOCATION_MONITORING_INTERVAL = MonitoringInterval.ONE
+		.getInterval();
 	private static final Class<? extends BaseReceiver> PERSONAL_RECEIVER = LocationReceiver.class;
 	// Location api calls constants
 	private static final int MIN_TIME_BETWEEN_SCANS = 1 * 30 * 1000; // 30 secs
 	private static final int MIN_DISTANCE = 0;
 	public static final String NOTIFICATION_TAG = LocationMonitor.class
-			.getSimpleName() + ".Notification";
+		.getSimpleName() + ".Notification";
 	private static final int NOTIFICATION_ID = 9200;
 	private static final String LOCATION_DATA_KEY = "LOCATION_DATA_KEY";
+	private static final String SAME_LOCATION_COUNT_KEY = "SAME_LOCATION_COUNT_KEY";
+	private static final String LOCATION_INTERVAL_KEY = "LOCATION_INTERVAL_KEY";
 	// convenience fields
 	private static volatile LocationManager lm; // not final - we need a context
 	// members
@@ -102,7 +106,7 @@ public final class LocationMonitor extends Monitor<Location, Position> {
 			final Bundle extras = intent.getExtras();
 			if (extras != null) {
 				final Location loc = (Location) extras
-						.get(LocationManager.KEY_LOCATION_CHANGED);
+					.get(LocationManager.KEY_LOCATION_CHANGED);
 				if (loc == null) {
 					w(sb + "NULL LOCATION  - EXTRAS : " + extras);
 				} else {
@@ -139,6 +143,9 @@ public final class LocationMonitor extends Monitor<Location, Position> {
 
 	@Override
 	void cleanup() {
+		zeroCount();
+		resetInterval();
+		clearLastResults();
 		receiver(DISABLE);
 		lm().removeUpdates(pi); // TODO : maybe check if requested ?
 	}
@@ -197,12 +204,12 @@ public final class LocationMonitor extends Monitor<Location, Position> {
 			if (s.equals(LocationManager.NETWORK_PROVIDER)) {
 				// Check if wireless is enabled
 				WifiManager wm = (WifiManager) ctx
-						.getSystemService(Context.WIFI_SERVICE);
+					.getSystemService(Context.WIFI_SERVICE);
 				if (!wm.isWifiEnabled()) {
 					return Status.NETWORK_NOT_ENABLED;
 				}
 				ConnectivityManager cm = (ConnectivityManager) ctx
-						.getSystemService(CONNECTIVITY_SERVICE);
+					.getSystemService(CONNECTIVITY_SERVICE);
 				Boolean isWifi = cm.getNetworkInfo(
 				// TODO : isConnectedOrConnecting ? long periods of no
 				// connection go unnoticed
@@ -219,8 +226,9 @@ public final class LocationMonitor extends Monitor<Location, Position> {
 			Intent intent = DialogActivity.launchDialogActivityIntent(ctx,
 				stat.title(ctx), stat.dialog(ctx), stat.launchIntent());
 			// intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK); // nope
-			triggerDialogNotification(ctx, stat.title(ctx), stat.notification(ctx),
-				intent, NOTIFICATION_TAG, NOTIFICATION_ID);
+			triggerDialogNotification(ctx, NOTIFICATION_ID, stat.title(ctx),
+				stat.notification(ctx), intent, NOTIFICATION_TAG,
+				NOTIFICATION_ID);
 		}
 
 		@SuppressWarnings("unused")
@@ -257,17 +265,17 @@ public final class LocationMonitor extends Monitor<Location, Position> {
 					return ctx.getString(R.string.notification_null);
 				case NETWORK_NOT_CONNECTED:
 					return ctx
-							.getString(R.string.notification_network_not_connected);
+						.getString(R.string.notification_network_not_connected);
 				case GPS:
 					return ctx.getString(R.string.notification_gps);
 				case NETWORK:
 					return ctx.getString(R.string.notification_network);
 				case UNKNOWN_PROVIDER:
 					return ctx
-							.getString(R.string.notification_unknown_provider);
+						.getString(R.string.notification_unknown_provider);
 				case NETWORK_NOT_ENABLED:
 					return ctx
-							.getString(R.string.notification_network_not_enabled);
+						.getString(R.string.notification_network_not_enabled);
 				}
 				throw new AssertionError("Forgotten enum constant");
 			}
@@ -324,11 +332,17 @@ public final class LocationMonitor extends Monitor<Location, Position> {
 	public void saveResults(Location data) throws FileNotFoundException,
 			IOException {
 		List<byte[]> listByteArrays = Position.LocationFields
-				.createListOfByteArrays(data);
+			.createListOfByteArrays(data);
 		Position.saveData(this, listByteArrays);
 		try {
-			final String string = Position.fromBytes(listByteArrays).toString();
-			putPref(LOCATION_DATA_KEY, string);
+			final Position currentPosition = Position.fromBytes(listByteArrays);
+			// get the previous data from the preferences store
+			String previousData = getPref(LOCATION_DATA_KEY, null);
+			Position previousPosition = Position.fromString(previousData);
+			// check to see if we need to modify the interval
+			updateInterval(currentPosition, previousPosition);
+			// store the new data
+			putPref(LOCATION_DATA_KEY, currentPosition.stringForm());
 			runOnUiThread(new Runnable() {
 
 				@Override
@@ -343,5 +357,25 @@ public final class LocationMonitor extends Monitor<Location, Position> {
 
 	public static String dataKey() {
 		return LOCATION_DATA_KEY;
+	}
+
+	@Override
+	String getLastResultsPrefKey() {
+		return LOCATION_DATA_KEY;
+	}
+
+	@Override
+	String getSameResultsCountPrefKey() {
+		return SAME_LOCATION_COUNT_KEY;
+	}
+
+	@Override
+	String getCurrentIntervalPrefKey() {
+		return LOCATION_INTERVAL_KEY;
+	}
+
+	@Override
+	void rescheduleAlarms() {
+		rescheduleAlarm(LocationMonitoringReceiver.class);
 	}
 }

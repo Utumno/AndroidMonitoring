@@ -22,4 +22,5 @@
     <string name="str_pref_server_url_title">Server url</string>
     <string name="str_pref_server_url_default">http://192.168.1.64:8080/DataCollectionServlet/</string>
     <string name="menu_send_files">Send files</string>
+    <string name="update_button_text">Update</string>
 </resources>

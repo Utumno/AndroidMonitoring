@@ -60,9 +60,9 @@ public class AlarmReceiver extends BroadcastReceiver {
 				if (xpp.getEventType() == XmlPullParser.START_TAG) {
 					if (xpp.getName().equals("WakefulIntentService")) {
 						String clsName = xpp
-								.getAttributeValue(null, "listener");
+							.getAttributeValue(null, "listener");
 						Class<AlarmListener> cls = (Class<AlarmListener>) Class
-								.forName(clsName);
+							.forName(clsName);
 						return (cls.newInstance());
 					}
 				}
@@ -78,10 +78,10 @@ public class AlarmReceiver extends BroadcastReceiver {
 			throw new RuntimeException("Listener class not found", e);
 		} catch (IllegalAccessException e) {
 			throw new RuntimeException(
-					"Listener is not public or lacks public constructor", e);
+				"Listener is not public or lacks public constructor", e);
 		} catch (InstantiationException e) {
 			throw new RuntimeException("Could not create instance of listener",
-					e);
+				e);
 		}
 		return (null);
 	}

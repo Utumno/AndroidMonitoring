@@ -31,10 +31,13 @@ public final class C {
 	// used by fragments and monitor activity
 	public final static String DATA_PREFS_KEY_INTENT_KEY = "DATA_PREFS_KEY_INTENT_KEY";
 	public final static String DATA_INTRO_INTENT_KEY = "DATA_INTRO_KEY";
+	public final static String START_SERVICE_INTENT_INTENT_KEY = "START_SERVICE_INTENT_INTENT_KEY";
 	// ACTIONS
 	private static final CharSequence ACTION_PREFIX = "gr.uoa.di.monitoring.android.intent.action.";
 	public static final CharSequence ac_setup_alarm = ACTION_PREFIX
 		+ "SETUP_ALARM";
+	public static final CharSequence ac_reschedule_alarm = ACTION_PREFIX
+		+ "RESCHEDULE_ALARM";
 	public static final CharSequence ac_cancel_alarm = ACTION_PREFIX
 		+ "CANCEL_ALARM";
 	public static final CharSequence ac_monitor = ACTION_PREFIX + "MONITOR";
@@ -90,7 +93,7 @@ public final class C {
 		final Intent i = new Intent(action);
 		// i.addCategory(Intent.CATEGORY_LAUNCHER);
 		// i.setComponent(gps);
-		// i.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+		i.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK); // needed ? see ******
 		return i;
 	}
 
@@ -118,7 +121,9 @@ public final class C {
 		final Intent i = new Intent();
 		// i.addCategory(Intent.CATEGORY_LAUNCHER);
 		i.setComponent(toLaunch);
-		// i.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+		i.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK); // ****** if I use i from non
+		// activity a warning is issued "startActivity called from non-Activity
+		// context; forcing Intent.FLAG_ACTIVITY_NEW_TASK". So I add this here
 		return i;
 	}
 
@@ -130,18 +135,25 @@ public final class C {
 	 *            needed to retrieve the NotificationManager System service and
 	 *            register the pending intent
 	 * @param title
+	 *            the title of the notification
 	 * @param message
+	 *            the message of the notification
 	 * @param intent
 	 *            the intent for the activity to launch - tested with
 	 *            {@link #launchActivityIntent}
 	 * @param tag
+	 *            the tag of the notification
 	 * @param id
+	 *            the id of the notification
+	 * @param requestCode
+	 *            specify this to a different value for your notifications, so
+	 *            if launched simultaneously they register different intents
 	 */
 	public static void triggerDialogNotification(Context context,
-			CharSequence title, CharSequence message, Intent intent,
-			String tag, int id) {
-		PendingIntent pi = PendingIntent.getActivity(context, NOT_USED, intent,
-			PendingIntent.FLAG_UPDATE_CURRENT); // FLAG_UPDATE_CURRENT?
+			int requestCode, CharSequence title, CharSequence message,
+			Intent intent, String tag, int id) {
+		PendingIntent pi = PendingIntent.getActivity(context, requestCode,
+			intent, PendingIntent.FLAG_UPDATE_CURRENT); // FLAG_UPDATE_CURRENT?
 		Notification not = new NotificationCompat.Builder(context)
 			.setContentTitle(title).setContentText(message)
 			.setContentIntent(pi)

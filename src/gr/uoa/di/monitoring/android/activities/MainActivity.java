@@ -18,11 +18,10 @@ import gr.uoa.di.monitoring.android.services.WifiMonitor;
 
 import static gr.uoa.di.monitoring.android.C.DATA_INTRO_INTENT_KEY;
 import static gr.uoa.di.monitoring.android.C.DATA_PREFS_KEY_INTENT_KEY;
+import static gr.uoa.di.monitoring.android.C.START_SERVICE_INTENT_INTENT_KEY;
 
 public class MainActivity extends BaseActivity implements OnClickListener {
 
-	private String dataKey;
-	private String dataIntroString;
 	private final static int[] BUTTONS = { R.id.battery_button,
 			R.id.gps_button, R.id.wifi_button };
 
@@ -83,23 +82,30 @@ public class MainActivity extends BaseActivity implements OnClickListener {
 
 	@Override
 	public void onClick(View v) {
+		String dataKey = null;
+		String dataIntroString = null;
+		Intent serviceIntent = null;
 		switch (v.getId()) {
 		case R.id.battery_button:
 			dataKey = BatteryMonitor.dataKey();
 			dataIntroString = getString(R.string.battery_intro);
+			serviceIntent = new Intent(this, BatteryMonitor.class);
 			break;
 		case R.id.gps_button:
 			dataKey = LocationMonitor.dataKey();
 			dataIntroString = getString(R.string.location_intro);
+			serviceIntent = new Intent(this, LocationMonitor.class);
 			break;
 		case R.id.wifi_button:
 			dataKey = WifiMonitor.dataKey();
 			dataIntroString = getString(R.string.wifi_intro);
+			serviceIntent = new Intent(this, WifiMonitor.class);
 			break;
 		}
 		Intent intent = new Intent(this, MonitorActivity.class);
 		intent.putExtra(DATA_PREFS_KEY_INTENT_KEY, dataKey);
 		intent.putExtra(DATA_INTRO_INTENT_KEY, dataIntroString);
+		intent.putExtra(START_SERVICE_INTENT_INTENT_KEY, serviceIntent);
 		startActivity(intent);
 	}
 }

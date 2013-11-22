@@ -29,7 +29,7 @@ abstract public class WakefulIntentService extends IntentService {
 	synchronized private static PowerManager.WakeLock getLock(Context context) {
 		if (lockStatic == null) {
 			PowerManager mgr = (PowerManager) context
-					.getSystemService(Context.POWER_SERVICE);
+				.getSystemService(Context.POWER_SERVICE);
 			lockStatic = mgr.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, NAME);
 			lockStatic.setReferenceCounted(true);
 		}
@@ -56,9 +56,9 @@ abstract public class WakefulIntentService extends IntentService {
 		if (lastAlarm == 0
 			|| force
 			|| (System.currentTimeMillis() > lastAlarm && System
-					.currentTimeMillis() - lastAlarm > listener.getMaxAge())) {
+				.currentTimeMillis() - lastAlarm > listener.getMaxAge())) {
 			AlarmManager mgr = (AlarmManager) ctxt
-					.getSystemService(Context.ALARM_SERVICE);
+				.getSystemService(Context.ALARM_SERVICE);
 			Intent i = new Intent(ctxt, AlarmReceiver.class);
 			PendingIntent pi = PendingIntent.getBroadcast(ctxt, 0, i, 0);
 			listener.scheduleAlarms(mgr, pi, ctxt);
@@ -67,7 +67,7 @@ abstract public class WakefulIntentService extends IntentService {
 
 	public static void cancelAlarms(Context ctxt) {
 		AlarmManager mgr = (AlarmManager) ctxt
-				.getSystemService(Context.ALARM_SERVICE);
+			.getSystemService(Context.ALARM_SERVICE);
 		Intent i = new Intent(ctxt, AlarmReceiver.class);
 		PendingIntent pi = PendingIntent.getBroadcast(ctxt, 0, i, 0);
 		mgr.cancel(pi);

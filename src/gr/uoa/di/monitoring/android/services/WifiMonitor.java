@@ -14,6 +14,7 @@ import gr.uoa.di.monitoring.android.R;
 import gr.uoa.di.monitoring.android.activities.MonitorActivity;
 import gr.uoa.di.monitoring.android.receivers.BaseReceiver;
 import gr.uoa.di.monitoring.android.receivers.ScanResultsReceiver;
+import gr.uoa.di.monitoring.android.receivers.WifiMonitoringReceiver;
 import gr.uoa.di.monitoring.model.ParserException;
 import gr.uoa.di.monitoring.model.Wifi;
 
@@ -34,7 +35,8 @@ import static gr.uoa.di.monitoring.android.C.triggerNotification;
 public final class WifiMonitor extends Monitor<List<ScanResult>, Wifi> {
 
 	// TODO : timeout wait()
-	private static final long WIFI_MONITORING_INTERVAL = 1 * 60 * 1000L;
+	private static final long WIFI_MONITORING_INTERVAL = MonitoringInterval.ONE
+		.getInterval();
 	private static final Class<? extends BaseReceiver> PERSONAL_RECEIVER = ScanResultsReceiver.class;
 	// Internal preferences keys - persist state even on unloading app classes
 	private static final String HAVE_ENABLED_WIFI_PREF_KEY = APP_PACKAGE_NAME
@@ -49,6 +51,8 @@ public final class WifiMonitor extends Monitor<List<ScanResult>, Wifi> {
 		.getSimpleName() + ".Notification";
 	private static final int NOTIFICATION_ID = 9201;
 	private static final String WIFI_DATA_KEY = "WIFI_DATA_KEY";
+	private static final String SAME_WIFI_COUNT_KEY = "SAME_WIFI_COUNT_KEY";
+	private static final String WIFI_INTERVAL_KEY = "WIFI_INTERVAL_KEY";
 	private static WifiLock wifiLock;
 	private static volatile boolean done = false;
 	// convenience fields
@@ -63,6 +67,7 @@ public final class WifiMonitor extends Monitor<List<ScanResult>, Wifi> {
 	protected void doWakefulWork(Intent in) {
 		StringBuilder sb = debugHeader();
 		final CharSequence action = in.getAction();
+		boolean aborting = false;
 		try {
 			if (action == null) {
 				// monitor command from the alarm manager
@@ -111,6 +116,7 @@ public final class WifiMonitor extends Monitor<List<ScanResult>, Wifi> {
 				d("Get the scan results (null?) - wireless disabled !");
 			} else if (ac_aborting.equals(action)) {
 				cleanup();
+				aborting = true;
 			}
 		} catch (WmNotAvailableException e) {
 			w(e.getMessage());
@@ -120,12 +126,15 @@ public final class WifiMonitor extends Monitor<List<ScanResult>, Wifi> {
 		} finally {
 			synchronized (Gatekeeper.WIFI_MONITOR) {
 				if (done) {
-					warnScanResults(sb);
-					save(wm().getScanResults());
+					if (!aborting) {
+						warnScanResults(sb);
+						save(wm().getScanResults());
+					}
 					disableWifiIfIhadItEnableMyself();
 					d("Releasing wake lock for the scan");
 					releaseWifiLock();
 					done = false;
+					aborting = false;
 				}
 			}
 			w("Finishing " + action);
@@ -138,6 +147,9 @@ public final class WifiMonitor extends Monitor<List<ScanResult>, Wifi> {
 
 	@Override
 	void cleanup() {
+		zeroCount();
+		resetInterval();
+		clearLastResults();
 		done = true;
 		receiver(DISABLE);
 	}
@@ -379,16 +391,18 @@ public final class WifiMonitor extends Monitor<List<ScanResult>, Wifi> {
 	@Override
 	void saveResults(List<ScanResult> data) throws FileNotFoundException,
 			IOException {
-		List<byte[]> listByteArrays = Wifi.WifiFields
-			.createListOfByteArrays(data);
 		List<List<byte[]>> listOfListsOfByteArrays = Wifi.WifiFields
 			.createListOfListsOfByteArrays(data);
-		Wifi.saveData(this, listByteArrays, listOfListsOfByteArrays,
-			Wifi.WifiFields.class);
+		Wifi.saveData(this, listOfListsOfByteArrays, Wifi.WifiFields.class);
 		try {
-			final String string = Wifi.fromBytes(listByteArrays,
-				listOfListsOfByteArrays).toString();
-			putPref(WIFI_DATA_KEY, string);
+			final Wifi currentWifi = Wifi.fromBytes(listOfListsOfByteArrays);
+			// get the previous data from the preferences store
+			String previousData = getPref(WIFI_DATA_KEY, null);
+			Wifi previousWifi = Wifi.fromString(previousData);
+			// check to see if we need to modify the interval
+			updateInterval(currentWifi, previousWifi);
+			// store the new data
+			putPref(WIFI_DATA_KEY, currentWifi.stringForm());
 			runOnUiThread(new Runnable() {
 
 				@Override
@@ -403,5 +417,25 @@ public final class WifiMonitor extends Monitor<List<ScanResult>, Wifi> {
 
 	public static String dataKey() {
 		return WIFI_DATA_KEY;
+	}
+
+	@Override
+	String getLastResultsPrefKey() {
+		return WIFI_DATA_KEY;
+	}
+
+	@Override
+	String getSameResultsCountPrefKey() {
+		return SAME_WIFI_COUNT_KEY;
+	}
+
+	@Override
+	String getCurrentIntervalPrefKey() {
+		return WIFI_INTERVAL_KEY;
+	}
+
+	@Override
+	void rescheduleAlarms() {
+		rescheduleAlarm(WifiMonitoringReceiver.class);
 	}
 }

@@ -17,10 +17,10 @@ import static gr.uoa.di.monitoring.android.C.ac_scan_wifi_enabled;
 
 /**
  * BroadcastReceiver registered to receive wifi scan events. If this is enabled
- * it means I wait for network scan. So I disable myself and broadcast to the
- * WiffiMonitoringReceiver so it can collect the scan results. I leave wireless
- * open since I am not sure I can have the results if not. Still TODO : what if
- * the user has enabled the wireless again meanwhile ?
+ * it means I wait for network scan. Once I have the scan results I disable
+ * myself and broadcast to the WiffiMonitoringReceiver so it can collect them. I
+ * leave wireless open since I am not sure I can have the results if not. Still
+ * TODO : what if the user has enabled the wireless again meanwhile ?
  *
  * @author MrD
  */
@@ -58,11 +58,12 @@ public final class ScanResultsReceiver extends BaseReceiver {
 				break;
 			case WifiManager.WIFI_STATE_ENABLED:
 				Intent i2 = new Intent(ac_scan_wifi_enabled.toString(),
-						Uri.EMPTY, context, MONITOR_CLASS);
+					Uri.EMPTY, context, MONITOR_CLASS);
 				WakefulIntentService.sendWakefulWork(context, i2);
 				break;
 			case WifiManager.WIFI_STATE_DISABLING:
 				d("Disabling");
+				break; // TODO : maybe not (?)
 			case WifiManager.WIFI_STATE_DISABLED:
 				d("Wifi failed (for instance E/WifiService(173): Failed to "
 					+ "load Wi-Fi driver) - disabling myself");
@@ -71,7 +72,7 @@ public final class ScanResultsReceiver extends BaseReceiver {
 				// intent is received (like disabling network or whatever ?)
 				BaseReceiver.enable(context, DISABLE, this.getClass());
 				Intent i = new Intent(ac_scan_wifi_disabled.toString(),
-						Uri.EMPTY, context, MONITOR_CLASS);
+					Uri.EMPTY, context, MONITOR_CLASS);
 				WakefulIntentService.sendWakefulWork(context, i);
 				break;
 			default:
@@ -88,7 +89,7 @@ public final class ScanResultsReceiver extends BaseReceiver {
 			d("Directly invoke wifi monitor");
 			// TODO : uh oh, modularity
 			Intent i = new Intent(ac_scan_results_available.toString(),
-					Uri.EMPTY, context, MONITOR_CLASS);
+				Uri.EMPTY, context, MONITOR_CLASS);
 			WakefulIntentService.sendWakefulWork(context, i);
 		} else {
 			w("Received bogus intent :\n" + intent + "\nAction : " + action);

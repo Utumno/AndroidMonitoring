@@ -21,6 +21,8 @@ public abstract class AlarmService extends WakefulIntentService implements
 
 	public abstract long getInterval();
 
+	public abstract long getCurrentInterval();
+
 	public static int getInitialDelay() {
 		return INITIAL_DELAY;
 	}

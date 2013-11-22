@@ -203,8 +203,8 @@ public class SettingsActivity extends PreferenceActivity {
 				int index = listPreference.findIndexOfValue(stringValue);
 				// Set the summary to reflect the new value.
 				preference
-						.setSummary(index >= 0 ? listPreference.getEntries()[index]
-								: null);
+					.setSummary(index >= 0 ? listPreference.getEntries()[index]
+							: null);
 			} else if (preference instanceof RingtonePreference) {
 				// For ringtone preferences, look up the correct display value
 				// using RingtoneManager.
@@ -221,7 +221,7 @@ public class SettingsActivity extends PreferenceActivity {
 						// Set the summary to reflect the new ringtone display
 						// name.
 						String name = ringtone
-								.getTitle(preference.getContext());
+							.getTitle(preference.getContext());
 						preference.setSummary(name);
 					}
 				}
@@ -230,7 +230,7 @@ public class SettingsActivity extends PreferenceActivity {
 				Log.w(TAG, "::::value " + b);
 				final CheckBoxPreference p = (CheckBoxPreference) preference;
 				preference.setSummary((b) ? p.getSummaryOn() : p
-						.getSummaryOff());
+					.getSummaryOff());
 				Log.w(TAG, p.getKey() + " :: " + p.isChecked());
 			} else {
 				// if (!MASTER_ENABLE.equals(value.toString())) {
@@ -262,7 +262,7 @@ public class SettingsActivity extends PreferenceActivity {
 				boolean b = (Boolean) newValue;
 				final CheckBoxPreference p = (CheckBoxPreference) preference;
 				preference.setSummary((b) ? p.getSummaryOn() : p
-						.getSummaryOff());
+					.getSummaryOff());
 				// TODO : display dialog and wait till preference
 				// enabled/disabled
 				return true;
@@ -284,7 +284,7 @@ public class SettingsActivity extends PreferenceActivity {
 			Preference preference) {
 		// Set the listener to watch for value changes.
 		preference
-				.setOnPreferenceChangeListener(sBindPreferenceSummaryToValueListener);
+			.setOnPreferenceChangeListener(sBindPreferenceSummaryToValueListener);
 		// Trigger the listener immediately with the preference's
 		// current value.
 		sBindPreferenceSummaryToValueListener.onPreferenceChange(
@@ -305,7 +305,7 @@ public class SettingsActivity extends PreferenceActivity {
 	private static void bindPreferenceSummaryToValue(Preference preference) {
 		// Set the listener to watch for value changes.
 		preference
-				.setOnPreferenceChangeListener(sBindPreferenceSummaryToValueListener);
+			.setOnPreferenceChangeListener(sBindPreferenceSummaryToValueListener);
 		// Trigger the listener immediately with the preference's
 		// current value.
 		sBindPreferenceSummaryToValueListener.onPreferenceChange(
