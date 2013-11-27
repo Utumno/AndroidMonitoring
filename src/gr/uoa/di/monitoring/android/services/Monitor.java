@@ -8,6 +8,7 @@ import android.util.Log;
 
 import gr.uoa.di.android.helpers.AccessPreferences;
 import gr.uoa.di.monitoring.android.R;
+import gr.uoa.di.monitoring.android.activities.MonitorActivity;
 import gr.uoa.di.monitoring.android.receivers.BaseAlarmReceiver;
 import gr.uoa.di.monitoring.android.receivers.BaseReceiver;
 import gr.uoa.di.monitoring.android.receivers.BatteryLowReceiver;
@@ -24,6 +25,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static gr.uoa.di.monitoring.android.C.DISABLE;
+import static gr.uoa.di.monitoring.android.C.MANUAL_UPDATE_INTENT_KEY;
 import static gr.uoa.di.monitoring.android.C.ac_cancel_alarm;
 import static gr.uoa.di.monitoring.android.C.ac_reschedule_alarm;
 import static gr.uoa.di.monitoring.android.C.ac_setup_alarm;
@@ -39,6 +41,7 @@ public abstract class Monitor<K, Y extends Data> extends AlarmService {
 	/** Delimiter used to separate the items in debug prints */
 	private Handler handler;
 	static final String DEBUG_DELIMITER = "::";
+	private final Object update_status_lock_ = new Object();
 	static {
 		SETUP_ALARM_RECEIVERS.add(BatteryMonitoringReceiver.class);
 		SETUP_ALARM_RECEIVERS.add(WifiMonitoringReceiver.class);
@@ -85,6 +88,30 @@ public abstract class Monitor<K, Y extends Data> extends AlarmService {
 	abstract String getLastResultsPrefKey();
 
 	abstract void rescheduleAlarms();
+
+	/**
+	 * Queries an internal preference indicating if update is in progress. Must
+	 * be called in a synchronized block.
+	 *
+	 * @return true if an update is in progress, false otherwise
+	 */
+	abstract boolean isUpdateInProgress();
+
+	/**
+	 * Sets an internal preference indicating if update is in progress. Must be
+	 * called in a synchronized block.
+	 *
+	 * @param updating
+	 */
+	abstract void setUpdateInProgress(boolean updating);
+
+	abstract String getManualUpdatePrefKey();
+
+	/**
+	 * Sets an internal preference indicating if that the update was triggered
+	 * by the user to false
+	 */
+	abstract void clearManualUpdateFlag();
 
 	// =========================================================================
 	// API
@@ -153,8 +180,9 @@ public abstract class Monitor<K, Y extends Data> extends AlarmService {
 	// Methods used by the subclasses
 	// =========================================================================
 	/**
-	 * Save the data into internal storage. Encapsulates common behavior of
-	 * monitors on failing to write the data
+	 * Save the data into internal storage. Notify the UI that update is
+	 * finished. Encapsulates common behavior of monitors on failing to write
+	 * the data
 	 *
 	 * @param data
 	 * @return
@@ -169,6 +197,8 @@ public abstract class Monitor<K, Y extends Data> extends AlarmService {
 		} catch (IOException e) {
 			// TODO abort ?
 			w("IO exception writing data :" + e.getMessage());
+		} finally {
+			updateFinished();
 		}
 		return false;
 	}
@@ -198,32 +228,70 @@ public abstract class Monitor<K, Y extends Data> extends AlarmService {
 		return sb;
 	}
 
-	void runOnUiThread(Runnable runnable) {
+	// update in progress methods
+	/**
+	 * Returns false if an update is already in progress, otherwise it marks
+	 * that an update is in progress, notifies the UI and returns true. Must be
+	 * called first thing when a monitoring command is received. Checks also the
+	 * intent for a boolean extra indicating manual update. Synchronizes on a
+	 * private lock for checking and updating the "update in progress" status -
+	 * the lock must be common to all instances of the service - the single
+	 * instance that is.
+	 *
+	 * @param in
+	 *            the intent used to start the service
+	 * @return
+	 */
+	boolean proceed(Intent in) {
+		synchronized (update_status_lock_) {
+			if (isUpdateInProgress()) {
+				w("Already updating, ignoring update request.");
+				return false;
+			}
+			setUpdateInProgress(true);
+		}
+		if (in.getBooleanExtra(MANUAL_UPDATE_INTENT_KEY, false)) {
+			putPref(getManualUpdatePrefKey(), true);
+		}
+		runOnUiThread(new Runnable() {
+
+			@Override
+			public void run() {
+				MonitorActivity.onUpdating();
+			}
+		});
+		return true;
+	}
+
+	void updateFinished() {
+		synchronized (update_status_lock_) {
+			setUpdateInProgress(false);
+			clearManualUpdateFlag();
+			runOnUiThread(new Runnable() {
+
+				@Override
+				public void run() {
+					MonitorActivity.onDataUpdated(Monitor.this);
+				}
+			});
+		}
+	}
+
+	// helper
+	private void runOnUiThread(Runnable runnable) {
 		handler.post(runnable);
 	}
 
 	// reschedule alarms methods used by the subclasses //
-	void zeroCount() {
-		putPref(getSameResultsCountPrefKey(), 0);
-	}
-
-	void resetInterval() {
-		putPref(getCurrentIntervalPrefKey(), getInterval());
-	}
-
-	void clearLastResults() {
-		putPref(getLastResultsPrefKey(), null);
-	}
-
 	void updateInterval(Y t1, Y t2) {
-		w("Current : " + t1);
-		w("Previous : " + t2);
+		d("Current : " + t1);
+		d("Previous : " + t2);
 		if (t1.fairlyEqual(t2)) {
 			final int sameResultsCount = getSameResultsCount();
-			w("sameResultsCount : " + sameResultsCount);
+			d("sameResultsCount : " + sameResultsCount);
 			final long newInterval = MonitoringInterval.getUpdatedInterval(
 				sameResultsCount + 1, getCurrentInterval());
-			w("newInterval : " + newInterval);
+			d("newInterval : " + newInterval);
 			// enum decides if it is time to update the interval
 			if (newInterval == 0) { // no time to update yet
 				increaseCount();
@@ -233,13 +301,35 @@ public abstract class Monitor<K, Y extends Data> extends AlarmService {
 				rescheduleAlarms();
 			}
 		} else {
-			w("!!!!!!! Different Results");
+			d("!!!!!!! Different Results");
 			zeroCount();
 			if (getCurrentInterval() != getInterval()) {
 				resetInterval();
 				rescheduleAlarms();
 			}
 		}
+	}
+
+	void commonCleanup() {
+		// reschedule the alarms cleanup
+		zeroCount();
+		resetInterval();
+		clearLastResults();
+		// reset updating flags + notify the UI
+		updateFinished();
+	}
+
+	// cleanup helpers
+	private void zeroCount() {
+		putPref(getSameResultsCountPrefKey(), 0);
+	}
+
+	private void resetInterval() {
+		putPref(getCurrentIntervalPrefKey(), getInterval());
+	}
+
+	private void clearLastResults() {
+		putPref(getLastResultsPrefKey(), null);
 	}
 
 	// private reschedule alarms methods used in updateInterval(Y t1, Y t2) //

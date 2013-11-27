@@ -73,71 +73,46 @@ public final class NetworkService extends AlarmService {
 				internalDirException("Could not access internal directory", e);
 				return;
 			}
-			// TODO : maybe enable mobile ?
 			WifiLock _wifiLock = null;
-			WifiManager wm = (WifiManager) getSystemService(Context.WIFI_SERVICE);
-			boolean failedToConnect = true;
-			if (wm != null && wm.isWifiEnabled()) {
-				d("WIFI is Enabled in your device");
-				_wifiLock = wm.createWifiLock(
-				/* WifiManager.WIFI_MODE_FULL_HIGH_PERF */0x3, this.getClass()
-					.getName() + ".WIFI_LOCK");
-				_wifiLock.acquire();
-				failedToConnect = !wakeWifiUp();
-			}
-			if (failedToConnect) {
-				Intent in = DialogActivity.launchDialogActivityIntent(this,
-					getString(R.string.title_enable_wifi),
-					getString(R.string.dialog_enable_wifi),
-					launchSettingsIntent(Settings.ACTION_WIFI_SETTINGS));
-				triggerDialogNotification(this, NOTIFICATION_ID,
-					getString(R.string.title_enable_wifi),
-					getString(R.string.notification_enable_wifi), in,
-					NOTIFICATION_TAG, NOTIFICATION_ID);
-				if (_wifiLock != null) {
-					_wifiLock.release();
-				}
-				w("No connection !");
-				return;
-			}
-			// Just generate some unique random value.
-			// TODO : Part boundaries should not occur in any of the data
-			// http://www.w3.org/TR/html401/interact/forms.html#h-17.13.4.2
-			final String boundary = Long
-				.toHexString(System.currentTimeMillis());
 			try {
-				connection = connection(true, boundary);
-				w("con : " + connection + " @ " + time());
-			} catch (IOException e) {
-				// openConnection() might throw but it is unlikely
-				w("IOException opening connection", e);
-				if (_wifiLock != null) {
-					_wifiLock.release();
+				// TODO : maybe enable mobile ?
+				WifiManager wm = (WifiManager) getSystemService(Context.WIFI_SERVICE);
+				boolean failedToConnect = true;
+				if (wm != null && wm.isWifiEnabled()) {
+					d("WIFI is Enabled in your device");
+					_wifiLock = wm.createWifiLock(
+					/* WifiManager.WIFI_MODE_FULL_HIGH_PERF */0x3, this
+						.getClass().getName() + ".WIFI_LOCK");
+					_wifiLock.acquire();
+					failedToConnect = !wakeWifiUp(); // TODO : !notify user
+														// if!Need
 				}
-				return;
-			}
-			synchronized (Persist.FILE_STORE_LOCK) {
-				d("lock " + Persist.FILE_STORE_LOCK);
-				try {
-					if (!Persist.availableData(this)) return; // in case the
-					// user tried to send the data anyway
-				} catch (IOException e) {
-					internalDirException("Could not access internal directory",
-						e);
-					if (_wifiLock != null) {
-						_wifiLock.release();
-					}
+				if (failedToConnect) {
+					Intent in = DialogActivity.launchDialogActivityIntent(this,
+						getString(R.string.title_enable_wifi),
+						getString(R.string.dialog_enable_wifi),
+						launchSettingsIntent(Settings.ACTION_WIFI_SETTINGS));
+					triggerDialogNotification(this, NOTIFICATION_ID,
+						getString(R.string.title_enable_wifi),
+						getString(R.string.notification_enable_wifi), in,
+						NOTIFICATION_TAG, NOTIFICATION_ID);
+					w("No connection !");
 					return;
 				}
-				File file = null;
+				// Just generate some unique random value.
+				// TODO : Part boundaries should not occur in any of the data
+				// http://www.w3.org/TR/html401/interact/forms.html#h-17.13.4.2
+				final String boundary = Long.toHexString(System
+					.currentTimeMillis());
 				try {
-					try {
-						file = Persist.file(this);
-					} catch (IOException e) {
-						internalDirException("IOException accessing files in "
-							+ "internal directory", e);
-						return;
-					}
+					connection = connection(true, boundary);
+					w("con : " + connection + " @ " + time());
+				} catch (IOException e) {
+					// openConnection() might throw but it is unlikely
+					w("IOException opening connection", e);
+					return;
+				}
+				try {
 					// outputStream = new DataOutputStream(
 					// con.getOutputStream()); // TODO : DataOutputStream ??
 					// after connection.getOutputStream() never call
@@ -145,40 +120,68 @@ public final class NetworkService extends AlarmService {
 					// Cannot set request property after connection is made
 					serverOutputStream = connection.getOutputStream(); // now
 					// this is really where the connection might seriously throw
-					try {
-						Net.flushMultiPartData(file, serverOutputStream,
-							boundary, false);
-					} catch (IOException e) {
-						w("IOException in flushMultiPartData : ", e);
-						return;
-					}
-					final int serverResponseCode = connection.getResponseCode();
-					if (serverResponseCode == HttpURLConnection.HTTP_OK) {
-						for (File f : Persist.internalFiles(this)) {
-							FileIO.delete(f); // check the return value
-						}
-						cancelNotification(this, NOTIFICATION_TAG,
-							NOTIFICATION_ID);
-						w("Success !");
-					} else {
-						w("Error in server communication - "
-							+ "ServerResponseCode : " + serverResponseCode);
-					}
 				} catch (IOException e) {
-					w("IOException sending data " + e.getMessage());
 					// Network unreachable : not connected
 					// No route to host : probably on an encrypted network see:
 					// http://stackoverflow.com/questions/18558047 (TODO)
 					// Connection timed out : Server DOWN
-				} finally {
-					// TODO does disconnect() close the serverOutputStream ?
-					// actually it is closed in flushMultipartData
-					// (writer.close)
-					if (_wifiLock != null) {
-						_wifiLock.release();
+					connection.disconnect();
+					w("IOException getting connection stream", e);
+					return;
+				}
+				synchronized (Persist.FILE_STORE_LOCK) {
+					d("lock " + Persist.FILE_STORE_LOCK);
+					try {
+						if (!Persist.availableData(this)) return; // in case the
+						// user tried to send the data anyway
+					} catch (IOException e) {
+						internalDirException(
+							"Could not access internal directory", e);
+						return;
 					}
-					if (file != null) FileIO.delete(file);
-					if (connection != null) connection.disconnect();
+					File file = null;
+					try {
+						try {
+							file = Persist.file(this);
+						} catch (IOException e) {
+							internalDirException(
+								"IOException accessing files in "
+									+ "internal directory", e);
+							return;
+						}
+						try {
+							Net.flushMultiPartData(file, serverOutputStream,
+								boundary, false);
+						} catch (IOException e) {
+							w("IOException in flushMultiPartData : ", e);
+							return;
+						}
+						final int serverResponseCode = connection
+							.getResponseCode();
+						if (serverResponseCode == HttpURLConnection.HTTP_OK) {
+							for (File f : Persist.internalFiles(this)) {
+								FileIO.delete(f); // check the return value
+							}
+							cancelNotification(this, NOTIFICATION_TAG,
+								NOTIFICATION_ID);
+							w("Success !");
+						} else {
+							w("Error in server communication - "
+								+ "ServerResponseCode : " + serverResponseCode);
+						}
+					} catch (IOException e) {
+						w("IOException sending data " + e.getMessage());
+					} finally {
+						// TODO does disconnect() close the serverOutputStream ?
+						// actually it is closed in flushMultipartData
+						// (writer.close)
+						if (file != null) FileIO.delete(file);
+						connection.disconnect();
+					}
+				}
+			} finally {
+				if (_wifiLock != null) {
+					_wifiLock.release();
 				}
 			}
 		} else if (ac_aborting.equals(action)) {

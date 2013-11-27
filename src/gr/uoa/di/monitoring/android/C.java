@@ -29,9 +29,25 @@ public final class C {
 		.toString().split(" ")[1];
 	public static final int UNDEFINED = -1;
 	// used by fragments and monitor activity
+	/**
+	 * Intent extra key holding the key of the Preference storing latest data
+	 * *for display*
+	 */
 	public final static String DATA_PREFS_KEY_INTENT_KEY = "DATA_PREFS_KEY_INTENT_KEY";
+	/** Intent extra key for the string intro to the data */
 	public final static String DATA_INTRO_INTENT_KEY = "DATA_INTRO_KEY";
+	/** Intent extra key for the intent that starts the update service */
 	public final static String START_SERVICE_INTENT_INTENT_KEY = "START_SERVICE_INTENT_INTENT_KEY";
+	/**
+	 * Intent extra key holding a boolean indicating if the intent comes from
+	 * manual update
+	 */
+	public final static String MANUAL_UPDATE_INTENT_KEY = "MANUAL_UPDATE_INTENT_KEY";
+	/**
+	 * Intent extra key holding the key of the boolean Preference indicating
+	 * that update is in progress
+	 */
+	public final static String UPDATE_IN_PROGRESS_INTENT_KEY = "UPDATE_IN_PROGRESS_INTENT_KEY";
 	// ACTIONS
 	private static final CharSequence ACTION_PREFIX = "gr.uoa.di.monitoring.android.intent.action.";
 	public static final CharSequence ac_setup_alarm = ACTION_PREFIX

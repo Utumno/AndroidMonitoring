@@ -11,7 +11,6 @@ import com.commonsware.cwac.wakeful.WakefulIntentService;
 
 import gr.uoa.di.android.helpers.AccessPreferences;
 import gr.uoa.di.monitoring.android.R;
-import gr.uoa.di.monitoring.android.activities.MonitorActivity;
 import gr.uoa.di.monitoring.android.receivers.BaseReceiver;
 import gr.uoa.di.monitoring.android.receivers.ScanResultsReceiver;
 import gr.uoa.di.monitoring.android.receivers.WifiMonitoringReceiver;
@@ -53,6 +52,9 @@ public final class WifiMonitor extends Monitor<List<ScanResult>, Wifi> {
 	private static final String WIFI_DATA_KEY = "WIFI_DATA_KEY";
 	private static final String SAME_WIFI_COUNT_KEY = "SAME_WIFI_COUNT_KEY";
 	private static final String WIFI_INTERVAL_KEY = "WIFI_INTERVAL_KEY";
+	private static final String WIFI_DATA_DISPLAY_KEY = "WIFI_DATA_DISPLAY_KEY";
+	private static final String WIFI_MANUAL_UPDATE_KEY = "WIFI_MANUAL_UPDATE_KEY";
+	private static final String WIFI_UPDATE_IN_PROGRESS_KEY = "WIFI_UPDATE_IN_PROGRESS_KEY";
 	private static WifiLock wifiLock;
 	private static volatile boolean done = false;
 	// convenience fields
@@ -70,7 +72,8 @@ public final class WifiMonitor extends Monitor<List<ScanResult>, Wifi> {
 		boolean aborting = false;
 		try {
 			if (action == null) {
-				// monitor command from the alarm manager
+				// monitoring command from the alarm manager or manual update
+				if (!proceed(in)) return;
 				// cancelNotification(this, NOTIFICATION_TAG, NOTIFICATION_ID);
 				cleanUp(); // FIXME !
 				d("Enabling the receiver");
@@ -147,11 +150,9 @@ public final class WifiMonitor extends Monitor<List<ScanResult>, Wifi> {
 
 	@Override
 	void cleanup() {
-		zeroCount();
-		resetInterval();
-		clearLastResults();
 		done = true;
 		receiver(DISABLE);
+		commonCleanup();
 	}
 
 	/**
@@ -396,29 +397,28 @@ public final class WifiMonitor extends Monitor<List<ScanResult>, Wifi> {
 		Wifi.saveData(this, listOfListsOfByteArrays, Wifi.WifiFields.class);
 		try {
 			final Wifi currentWifi = Wifi.fromBytes(listOfListsOfByteArrays);
-			// get the previous data from the preferences store
-			String previousData = getPref(WIFI_DATA_KEY, null);
-			Wifi previousWifi = Wifi.fromString(previousData);
-			// check to see if we need to modify the interval
-			updateInterval(currentWifi, previousWifi);
-			// store the new data
-			putPref(WIFI_DATA_KEY, currentWifi.stringForm());
-			runOnUiThread(new Runnable() {
-
-				@Override
-				public void run() {
-					MonitorActivity.onChange(WifiMonitor.this);
-				}
-			});
+			if (!getPref(getManualUpdatePrefKey(), false)) { // not mess the intervals
+				// get the previous data from the preferences store
+				String previousData = getPref(WIFI_DATA_KEY, null);
+				Wifi previousWifi = Wifi.fromString(previousData);
+				// check to see if we need to modify the interval
+				updateInterval(currentWifi, previousWifi);
+				// store the new data
+				putPref(WIFI_DATA_KEY, currentWifi.stringForm());
+			}
+			putPref(dataKey(), currentWifi.toString());
 		} catch (ParserException e) {
 			w("Corrupted data", e);
 		}
 	}
 
 	public static String dataKey() {
-		return WIFI_DATA_KEY;
+		return WIFI_DATA_DISPLAY_KEY;
 	}
 
+	public static String updateInProgressKey() {
+		return WIFI_UPDATE_IN_PROGRESS_KEY;
+	}
 	@Override
 	String getLastResultsPrefKey() {
 		return WIFI_DATA_KEY;
@@ -435,7 +435,27 @@ public final class WifiMonitor extends Monitor<List<ScanResult>, Wifi> {
 	}
 
 	@Override
+	String getManualUpdatePrefKey() {
+		return WIFI_MANUAL_UPDATE_KEY;
+	}
+
+	@Override
 	void rescheduleAlarms() {
 		rescheduleAlarm(WifiMonitoringReceiver.class);
+	}
+
+	@Override
+	boolean isUpdateInProgress() {
+		return getPref(WIFI_UPDATE_IN_PROGRESS_KEY, false);
+	}
+
+	@Override
+	void setUpdateInProgress(boolean updating) {
+		putPref(WIFI_UPDATE_IN_PROGRESS_KEY, updating);
+	}
+
+	@Override
+	void clearManualUpdateFlag() {
+		putPref(WIFI_MANUAL_UPDATE_KEY, false);
 	}
 }

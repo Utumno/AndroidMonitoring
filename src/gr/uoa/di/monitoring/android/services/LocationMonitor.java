@@ -13,7 +13,6 @@ import android.provider.Settings;
 
 import gr.uoa.di.monitoring.android.R;
 import gr.uoa.di.monitoring.android.activities.DialogActivity;
-import gr.uoa.di.monitoring.android.activities.MonitorActivity;
 import gr.uoa.di.monitoring.android.receivers.BaseReceiver;
 import gr.uoa.di.monitoring.android.receivers.LocationMonitoringReceiver;
 import gr.uoa.di.monitoring.android.receivers.LocationReceiver;
@@ -48,6 +47,9 @@ public final class LocationMonitor extends Monitor<Location, Position> {
 	private static final String LOCATION_DATA_KEY = "LOCATION_DATA_KEY";
 	private static final String SAME_LOCATION_COUNT_KEY = "SAME_LOCATION_COUNT_KEY";
 	private static final String LOCATION_INTERVAL_KEY = "LOCATION_INTERVAL_KEY";
+	private static final String LOCATION_DATA_DISPLAY_KEY = "LOCATION_DATA_DISPLAY_KEY";
+	private static final String LOCATION_MANUAL_UPDATE_KEY = "LOCATION_MANUAL_UPDATE_KEY";
+	private static final String LOCATION_UPDATE_IN_PROGRESS_KEY = "LOCATION_UPDATE_IN_PROGRESS_KEY";
 	// convenience fields
 	private static volatile LocationManager lm; // not final - we need a context
 	// members
@@ -82,7 +84,8 @@ public final class LocationMonitor extends Monitor<Location, Position> {
 		final StringBuilder sb = debugHeader();
 		final CharSequence action = intent.getAction();
 		if (action == null) {
-			// monitor command from the alarm manager
+			// monitoring command from the alarm manager or manual update
+			if (!proceed(intent)) return;
 			// cancelNotification(this, NOTIFICATION_TAG, NOTIFICATION_ID);
 			final String provider = Providers.getProvider(lm());
 			providerStatus = Providers.getProviderStatus(this, provider);
@@ -130,7 +133,11 @@ public final class LocationMonitor extends Monitor<Location, Position> {
 					save(loc);
 				}
 			} else {
-				w(sb + "NULL EXTRAS");
+				w(sb + "NULL EXTRAS - disabling LocationReceiver & removing "
+					+ "updates");
+				receiver(DISABLE);
+				lm().removeUpdates(pi);
+				updateFinished();
 			}
 		} else if (ac_aborting.equals(action)) {
 			cleanup();
@@ -143,11 +150,9 @@ public final class LocationMonitor extends Monitor<Location, Position> {
 
 	@Override
 	void cleanup() {
-		zeroCount();
-		resetInterval();
-		clearLastResults();
 		receiver(DISABLE);
 		lm().removeUpdates(pi); // TODO : maybe check if requested ?
+		commonCleanup();
 	}
 
 	private LocationManager lm() {
@@ -336,27 +341,27 @@ public final class LocationMonitor extends Monitor<Location, Position> {
 		Position.saveData(this, listByteArrays);
 		try {
 			final Position currentPosition = Position.fromBytes(listByteArrays);
-			// get the previous data from the preferences store
-			String previousData = getPref(LOCATION_DATA_KEY, null);
-			Position previousPosition = Position.fromString(previousData);
-			// check to see if we need to modify the interval
-			updateInterval(currentPosition, previousPosition);
-			// store the new data
-			putPref(LOCATION_DATA_KEY, currentPosition.stringForm());
-			runOnUiThread(new Runnable() {
-
-				@Override
-				public void run() {
-					MonitorActivity.onChange(LocationMonitor.this);
-				}
-			});
+			if (!getPref(getManualUpdatePrefKey(), false)) { // not mess the intervals
+				// get the previous data from the preferences store
+				String previousData = getPref(LOCATION_DATA_KEY, null);
+				Position previousPosition = Position.fromString(previousData);
+				// check to see if we need to modify the interval
+				updateInterval(currentPosition, previousPosition);
+				// store the new data
+				putPref(LOCATION_DATA_KEY, currentPosition.stringForm());
+			}
+			putPref(dataKey(), currentPosition.toString());
 		} catch (ParserException e) {
 			w("Corrupted data", e);
 		}
 	}
 
 	public static String dataKey() {
-		return LOCATION_DATA_KEY;
+		return LOCATION_DATA_DISPLAY_KEY;
+	}
+
+	public static String updateInProgressKey() {
+		return LOCATION_UPDATE_IN_PROGRESS_KEY;
 	}
 
 	@Override
@@ -375,7 +380,27 @@ public final class LocationMonitor extends Monitor<Location, Position> {
 	}
 
 	@Override
+	String getManualUpdatePrefKey() {
+		return LOCATION_MANUAL_UPDATE_KEY;
+	}
+
+	@Override
 	void rescheduleAlarms() {
 		rescheduleAlarm(LocationMonitoringReceiver.class);
+	}
+
+	@Override
+	boolean isUpdateInProgress() {
+		return getPref(LOCATION_UPDATE_IN_PROGRESS_KEY, false);
+	}
+
+	@Override
+	void setUpdateInProgress(boolean updating) {
+		putPref(LOCATION_UPDATE_IN_PROGRESS_KEY, updating);
+	}
+
+	@Override
+	void clearManualUpdateFlag() {
+		putPref(LOCATION_MANUAL_UPDATE_KEY, false);
 	}
 }

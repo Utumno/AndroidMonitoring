@@ -4,7 +4,6 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.os.BatteryManager;
 
-import gr.uoa.di.monitoring.android.activities.MonitorActivity;
 import gr.uoa.di.monitoring.android.receivers.BatteryMonitoringReceiver;
 import gr.uoa.di.monitoring.model.Battery;
 import gr.uoa.di.monitoring.model.ParserException;
@@ -22,6 +21,9 @@ public final class BatteryMonitor extends Monitor<Intent, Battery> {
 	private static final String BATTERY_DATA_KEY = "BATTERY_DATA_KEY";
 	private static final String SAME_BATTERY_COUNT_KEY = "SAME_BATTERY_COUNT_KEY";
 	private static final String BATTERY_INTERVAL_KEY = "BATTERY_INTERVAL_KEY";
+	private static final String BATTERY_DATA_DISPLAY_KEY = "BATTERY_DATA_DISPLAY_KEY";
+	private static final String BATTERY_MANUAL_UPDATE_KEY = "BATTERY_MANUAL_UPDATE_KEY";
+	private static final String BATTERY_UPDATE_IN_PROGRESS_KEY = "BATTERY_UPDATE_IN_PROGRESS_KEY";
 
 	public BatteryMonitor() {
 		// needed for service instantiation by Android. See :
@@ -38,14 +40,15 @@ public final class BatteryMonitor extends Monitor<Intent, Battery> {
 		StringBuilder sb = debugHeader();
 		final CharSequence action = in.getAction();
 		if (action == null) {
-			// monitoring command from the alarm manager
+			// monitoring command from the alarm manager or manual update
+			if (!proceed(in)) return;
 			final Intent batteryStatus = registerReceiver(null,
 				new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
 			// set the default to -1 as per :
 			// http://developer.android.com/training/monitoring-device-state/battery-monitoring.html
 			sb.append(batteryStatus.getIntExtra(BatteryManager.EXTRA_LEVEL, -1));
 			w(sb.toString());
-			save(batteryStatus);
+			save(batteryStatus); // updateFinished is called here
 		} else if (ac_aborting.equals(action)) {
 			cleanup();
 		}
@@ -58,9 +61,7 @@ public final class BatteryMonitor extends Monitor<Intent, Battery> {
 
 	@Override
 	void cleanup() {
-		zeroCount();
-		resetInterval();
-		clearLastResults();
+		commonCleanup();
 	}
 
 	@Override
@@ -70,27 +71,27 @@ public final class BatteryMonitor extends Monitor<Intent, Battery> {
 		Battery.saveData(this, listByteArrays);
 		try {
 			final Battery currentBattery = Battery.fromBytes(listByteArrays);
-			// get the previous data from the preferences store
-			String previousData = getPref(BATTERY_DATA_KEY, null);
-			Battery previousBattery = Battery.fromString(previousData);
-			// check to see if we need to modify the interval
-			updateInterval(currentBattery, previousBattery);
-			// store the new data
-			putPref(BATTERY_DATA_KEY, currentBattery.stringForm());
-			runOnUiThread(new Runnable() {
-
-				@Override
-				public void run() {
-					MonitorActivity.onChange(BatteryMonitor.this);
-				}
-			});
+			if (!getPref(getManualUpdatePrefKey(), false)) { // not mess the intervals
+				// get the previous data from the preferences store
+				String previousData = getPref(BATTERY_DATA_KEY, null);
+				Battery previousBattery = Battery.fromString(previousData);
+				// check to see if we need to modify the interval
+				updateInterval(currentBattery, previousBattery);
+				// store the new data
+				putPref(BATTERY_DATA_KEY, currentBattery.stringForm());
+			}
+			putPref(dataKey(), currentBattery.toString());
 		} catch (ParserException e) {
 			w("Corrupted data", e);
 		}
 	}
 
 	public static String dataKey() {
-		return BATTERY_DATA_KEY;
+		return BATTERY_DATA_DISPLAY_KEY;
+	}
+
+	public static String updateInProgressKey() {
+		return BATTERY_UPDATE_IN_PROGRESS_KEY;
 	}
 
 	@Override
@@ -109,7 +110,27 @@ public final class BatteryMonitor extends Monitor<Intent, Battery> {
 	}
 
 	@Override
+	String getManualUpdatePrefKey() {
+		return BATTERY_MANUAL_UPDATE_KEY;
+	}
+
+	@Override
 	void rescheduleAlarms() {
 		rescheduleAlarm(BatteryMonitoringReceiver.class);
+	}
+
+	@Override
+	boolean isUpdateInProgress() {
+		return getPref(BATTERY_UPDATE_IN_PROGRESS_KEY, false);
+	}
+
+	@Override
+	void setUpdateInProgress(boolean updating) {
+		putPref(BATTERY_UPDATE_IN_PROGRESS_KEY, updating);
+	}
+
+	@Override
+	void clearManualUpdateFlag(){
+		putPref(BATTERY_MANUAL_UPDATE_KEY, false);
 	}
 }

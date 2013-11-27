@@ -1,6 +1,8 @@
 <resources>
 	<string name="default_data_updating">Updating &#8230;</string>
-	<string name="battery_intro">The status of the battery is:\n</string>
-	<string name="wifi_intro">The available networks are:\n</string>
-	<string name="location_intro">The current location is:\n</string>
+	<string name="default_data_no_data">No data</string>
+	<string name="battery_intro">The last retrieved status of the battery is:\n</string>
+	<string name="wifi_intro">The last retrieved networks are:\n</string>
+	<string name="location_intro">The last retrieved location is:\n</string>
+	<string name="update_button_text">Update</string>
 </resources>

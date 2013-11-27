@@ -19,6 +19,7 @@ import gr.uoa.di.monitoring.android.services.WifiMonitor;
 import static gr.uoa.di.monitoring.android.C.DATA_INTRO_INTENT_KEY;
 import static gr.uoa.di.monitoring.android.C.DATA_PREFS_KEY_INTENT_KEY;
 import static gr.uoa.di.monitoring.android.C.START_SERVICE_INTENT_INTENT_KEY;
+import static gr.uoa.di.monitoring.android.C.UPDATE_IN_PROGRESS_INTENT_KEY;
 
 public class MainActivity extends BaseActivity implements OnClickListener {
 
@@ -84,20 +85,24 @@ public class MainActivity extends BaseActivity implements OnClickListener {
 	public void onClick(View v) {
 		String dataKey = null;
 		String dataIntroString = null;
+		String updatingKey = null;
 		Intent serviceIntent = null;
 		switch (v.getId()) {
 		case R.id.battery_button:
 			dataKey = BatteryMonitor.dataKey();
+			updatingKey = BatteryMonitor.updateInProgressKey();
 			dataIntroString = getString(R.string.battery_intro);
 			serviceIntent = new Intent(this, BatteryMonitor.class);
 			break;
 		case R.id.gps_button:
 			dataKey = LocationMonitor.dataKey();
+			updatingKey = LocationMonitor.updateInProgressKey();
 			dataIntroString = getString(R.string.location_intro);
 			serviceIntent = new Intent(this, LocationMonitor.class);
 			break;
 		case R.id.wifi_button:
 			dataKey = WifiMonitor.dataKey();
+			updatingKey = WifiMonitor.updateInProgressKey();
 			dataIntroString = getString(R.string.wifi_intro);
 			serviceIntent = new Intent(this, WifiMonitor.class);
 			break;
@@ -106,6 +111,7 @@ public class MainActivity extends BaseActivity implements OnClickListener {
 		intent.putExtra(DATA_PREFS_KEY_INTENT_KEY, dataKey);
 		intent.putExtra(DATA_INTRO_INTENT_KEY, dataIntroString);
 		intent.putExtra(START_SERVICE_INTENT_INTENT_KEY, serviceIntent);
+		intent.putExtra(UPDATE_IN_PROGRESS_INTENT_KEY, updatingKey);
 		startActivity(intent);
 	}
 }
