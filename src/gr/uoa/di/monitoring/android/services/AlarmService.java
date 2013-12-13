@@ -19,7 +19,7 @@ public abstract class AlarmService extends WakefulIntentService implements
 		super(name);
 	}
 
-	public abstract long getInterval();
+	public abstract long getBaseInterval();
 
 	public abstract long getCurrentInterval();
 

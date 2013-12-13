@@ -6,6 +6,8 @@ import android.net.Uri;
 import android.os.Handler;
 import android.util.Log;
 
+import com.commonsware.cwac.wakeful.WakefulIntentService;
+
 import gr.uoa.di.android.helpers.AccessPreferences;
 import gr.uoa.di.monitoring.android.R;
 import gr.uoa.di.monitoring.android.activities.MonitorActivity;
@@ -19,13 +21,13 @@ import gr.uoa.di.monitoring.android.receivers.TriggerMonitoringBootReceiver;
 import gr.uoa.di.monitoring.android.receivers.WifiMonitoringReceiver;
 import gr.uoa.di.monitoring.model.Data;
 
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
 import static gr.uoa.di.monitoring.android.C.DISABLE;
 import static gr.uoa.di.monitoring.android.C.MANUAL_UPDATE_INTENT_KEY;
+import static gr.uoa.di.monitoring.android.C.ac_aborting;
 import static gr.uoa.di.monitoring.android.C.ac_cancel_alarm;
 import static gr.uoa.di.monitoring.android.C.ac_reschedule_alarm;
 import static gr.uoa.di.monitoring.android.C.ac_setup_alarm;
@@ -76,15 +78,22 @@ public abstract class Monitor<K, Y extends Data> extends AlarmService {
 	 *
 	 * @param <K>
 	 * @throws IOException
-	 * @throws FileNotFoundException
+	 *             if the data failed to save
 	 */
-	abstract void saveResults(K data) throws FileNotFoundException, IOException;
+	abstract void saveResults(K data) throws IOException;
 
 	// reschedule alarms methods //
 	abstract String getSameResultsCountPrefKey();
 
 	abstract String getCurrentIntervalPrefKey();
 
+	/**
+	 * Returns the preference key that holds the previous data collected by this
+	 * Monitor to see if changed. Those data are not meant to be displayed by
+	 * the UI
+	 *
+	 * @return
+	 */
 	abstract String getLastResultsPrefKey();
 
 	abstract void rescheduleAlarms();
@@ -131,13 +140,15 @@ public abstract class Monitor<K, Y extends Data> extends AlarmService {
 	}
 
 	/**
-	 * Disables monitoring and sets the preference to false TODO : turn into
-	 * pause
+	 * Disables monitoring and sets the preference to false. Used by the
+	 * BatteryLowReceiver so we don't care about manual updates. TODO : turn
+	 * into pause
 	 *
 	 * @param ctx
 	 */
 	public static void abort(Context ctx) {
 		synchronized (Monitor.class) {
+			// we do not care if an update is manual
 			String master_enable = ctx.getResources()
 				.getText(R.string.enable_monitoring_master_pref_key).toString();
 			if (!AccessPreferences.get(ctx, master_enable, DISABLE)) return; // already
@@ -149,7 +160,7 @@ public abstract class Monitor<K, Y extends Data> extends AlarmService {
 
 	@Override
 	public long getCurrentInterval() {
-		return getPref(getCurrentIntervalPrefKey(), getInterval());
+		return getPref(getCurrentIntervalPrefKey(), getBaseInterval());
 	}
 
 	// API helpers
@@ -182,18 +193,15 @@ public abstract class Monitor<K, Y extends Data> extends AlarmService {
 	/**
 	 * Save the data into internal storage. Notify the UI that update is
 	 * finished. Encapsulates common behavior of monitors on failing to write
-	 * the data
+	 * the data.
 	 *
 	 * @param data
 	 * @return
 	 */
-	boolean save(K data) {
+	final boolean save(K data) {
 		try {
 			saveResults(data);
 			return true;
-		} catch (FileNotFoundException e) {
-			// TODO abort ?
-			w("IO exception writing data :" + e.getMessage());
 		} catch (IOException e) {
 			// TODO abort ?
 			w("IO exception writing data :" + e.getMessage());
@@ -203,14 +211,26 @@ public abstract class Monitor<K, Y extends Data> extends AlarmService {
 		return false;
 	}
 
-	/** Disables monitoring and sets the preference to false */
-	void abort() {
+	/**
+	 * Disables monitoring and sets the preference to false. If called from
+	 * manual update it sends ac_aborting to this otherwise it aborts all.
+	 */
+	final void abort() {
 		synchronized (Monitor.class) {
 			String master_enable = getResources().getText(
 				R.string.enable_monitoring_master_pref_key).toString();
-			if (!getPref(master_enable, DISABLE)) return; // already disabled
-			putPref(master_enable, DISABLE);
-			enableMonitoring(this, DISABLE);
+			if (!getPref(master_enable, DISABLE)
+				&& getPref(getManualUpdatePrefKey(), false)) {
+				// send message to MYSELF that the party is over
+				Intent i = new Intent(ac_aborting.toString(), Uri.EMPTY, this,
+					this.getClass());
+				WakefulIntentService.sendWakefulWork(this, i);
+				return;
+			} else if (!getPref(master_enable, DISABLE)) return;
+			else {
+				putPref(master_enable, DISABLE);
+				enableMonitoring(this, DISABLE);
+			}
 		}
 	}
 
@@ -220,7 +240,7 @@ public abstract class Monitor<K, Y extends Data> extends AlarmService {
 	 *
 	 * @return a StringBuilder containing the common info
 	 */
-	StringBuilder debugHeader() {
+	final StringBuilder debugHeader() {
 		StringBuilder sb = new StringBuilder();
 		// sb.append(System.currentTimeMillis() / 1000);
 		sb.append(time());
@@ -240,9 +260,10 @@ public abstract class Monitor<K, Y extends Data> extends AlarmService {
 	 *
 	 * @param in
 	 *            the intent used to start the service
-	 * @return
+	 * @return false if an update is already in progress, true if not so we can
+	 *         proceed
 	 */
-	boolean proceed(Intent in) {
+	final boolean proceed(Intent in) {
 		synchronized (update_status_lock_) {
 			if (isUpdateInProgress()) {
 				w("Already updating, ignoring update request.");
@@ -257,13 +278,13 @@ public abstract class Monitor<K, Y extends Data> extends AlarmService {
 
 			@Override
 			public void run() {
-				MonitorActivity.onUpdating();
+				MonitorActivity.onUpdating(Monitor.this);
 			}
 		});
 		return true;
 	}
 
-	void updateFinished() {
+	final void updateFinished() {
 		synchronized (update_status_lock_) {
 			setUpdateInProgress(false);
 			clearManualUpdateFlag();
@@ -283,7 +304,7 @@ public abstract class Monitor<K, Y extends Data> extends AlarmService {
 	}
 
 	// reschedule alarms methods used by the subclasses //
-	void updateInterval(Y t1, Y t2) {
+	final void updateInterval(Y t1, Y t2) {
 		d("Current : " + t1);
 		d("Previous : " + t2);
 		if (t1.fairlyEqual(t2)) {
@@ -303,14 +324,14 @@ public abstract class Monitor<K, Y extends Data> extends AlarmService {
 		} else {
 			d("!!!!!!! Different Results");
 			zeroCount();
-			if (getCurrentInterval() != getInterval()) {
+			if (getCurrentInterval() != getBaseInterval()) {
 				resetInterval();
 				rescheduleAlarms();
 			}
 		}
 	}
 
-	void commonCleanup() {
+	final void commonCleanup() {
 		// reschedule the alarms cleanup
 		zeroCount();
 		resetInterval();
@@ -325,10 +346,12 @@ public abstract class Monitor<K, Y extends Data> extends AlarmService {
 	}
 
 	private void resetInterval() {
-		putPref(getCurrentIntervalPrefKey(), getInterval());
+		putPref(getCurrentIntervalPrefKey(), getBaseInterval());
 	}
 
 	private void clearLastResults() {
+		// instead of putting null remove the pref (in the preferences that
+		// check the monitoring interval + see how the monitor activity behaves)
 		putPref(getLastResultsPrefKey(), null);
 	}
 
@@ -346,10 +369,20 @@ public abstract class Monitor<K, Y extends Data> extends AlarmService {
 		putPref(getCurrentIntervalPrefKey(), newInterval);
 	}
 
+	/**
+	 * Enum that encapsulates the possible monitoring intervals and defines the
+	 * policy that governs their relaxing. It exports
+	 * {@link MonitoringInterval#getUpdatedInterval(int, long)} to this end.
+	 *
+	 */
 	enum MonitoringInterval {
 		ONE(1, 4), TWO(2, 3), FIVE(5, 2), TEN(10, 1), FIFTEEN(15, 1), TWENTY(
 				20, 1), HALF_HOUR(30, 1), HOUR(60, Integer.MAX_VALUE);
 
+		/**
+		 * The number of monitor runs allowed to return the same results before
+		 * we relax the interval
+		 */
 		private final int retries;
 		private final long interval;
 
@@ -368,8 +401,12 @@ public abstract class Monitor<K, Y extends Data> extends AlarmService {
 		}
 
 		/**
-		 * Returns the new interval or 0 if no change is needed. Used by Monitor
-		 * - that's why it's not private
+		 * Returns the new interval or 0 if no change is needed. It takes as
+		 * input the number of the same results till now and the current
+		 * interval. Based on this info it decides if the current interval needs
+		 * to be relaxed. At the moment it considers a constant (the number of
+		 * retries allowed to return the same results) to decide but the
+		 * implementation can become more complicated as needed
 		 */
 		static long getUpdatedInterval(int sameResultsCount,
 				long currentInterval) {

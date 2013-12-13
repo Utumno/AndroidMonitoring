@@ -6,23 +6,23 @@ import android.content.Intent;
 import android.location.Criteria;
 import android.location.Location;
 import android.location.LocationManager;
-import android.net.ConnectivityManager;
 import android.net.wifi.WifiManager;
+import android.net.wifi.WifiManager.WifiLock;
 import android.os.Bundle;
 import android.provider.Settings;
 
+import gr.uoa.di.android.helpers.net.Net;
+import gr.uoa.di.android.helpers.net.WifiWaker;
 import gr.uoa.di.monitoring.android.R;
 import gr.uoa.di.monitoring.android.activities.DialogActivity;
 import gr.uoa.di.monitoring.android.receivers.BaseReceiver;
 import gr.uoa.di.monitoring.android.receivers.LocationMonitoringReceiver;
 import gr.uoa.di.monitoring.android.receivers.LocationReceiver;
-import gr.uoa.di.monitoring.model.ParserException;
 import gr.uoa.di.monitoring.model.Position;
 
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.Arrays;
-import java.util.List;
+import java.util.concurrent.CountDownLatch;
 
 import static gr.uoa.di.monitoring.android.C.DEBUG;
 import static gr.uoa.di.monitoring.android.C.DISABLE;
@@ -55,6 +55,12 @@ public final class LocationMonitor extends Monitor<Location, Position> {
 	// members
 	private static PendingIntent pi; // see above
 	private Providers.Status providerStatus;
+	// wifi waker
+	private volatile static CountDownLatch latch;
+	private static final long LATCH_TIMEOUT = MonitoringInterval.TWO
+		.getInterval();
+	private static final String WIFI_LOCK_TAG = LocationMonitor.class.getName()
+		+ ".WIFI_LOCK";
 
 	public LocationMonitor() {
 		super(LocationMonitor.class.getSimpleName());
@@ -105,6 +111,7 @@ public final class LocationMonitor extends Monitor<Location, Position> {
 			d("Requesting location updates - pi : " + pi);
 			lm().requestLocationUpdates(provider, MIN_TIME_BETWEEN_SCANS,
 				MIN_DISTANCE, pi);
+			// TODO : LATCH WITH TIMEOUT HERE
 		} else if (ac_location_data.equals(action)) {
 			final Bundle extras = intent.getExtras();
 			if (extras != null) {
@@ -112,6 +119,14 @@ public final class LocationMonitor extends Monitor<Location, Position> {
 					.get(LocationManager.KEY_LOCATION_CHANGED);
 				if (loc == null) {
 					w(sb + "NULL LOCATION  - EXTRAS : " + extras);
+					if (!extras
+						.getBoolean(LocationManager.KEY_PROVIDER_ENABLED)) {
+						w(sb + "Provider disabled - disabling "
+							+ "LocationReceiver & removing updates");
+						receiver(DISABLE);
+						lm().removeUpdates(pi);
+						updateFinished();
+					}
 				} else {
 					if (DEBUG) {
 						final String provider = loc.getProvider();
@@ -158,7 +173,7 @@ public final class LocationMonitor extends Monitor<Location, Position> {
 	private LocationManager lm() {
 		LocationManager result = lm;
 		if (result == null) {
-			synchronized (LocationManager.class) {
+			synchronized (LocationMonitor.class) {
 				result = lm;
 				if (result == null)
 					result = lm = (LocationManager) getSystemService(
@@ -168,11 +183,6 @@ public final class LocationMonitor extends Monitor<Location, Position> {
 		return result;
 	}
 
-	// // Lazy initialization holder class idiom for static fields
-	// private static class FieldHolder {
-	// static final FieldType field = computeFieldValue();
-	// }
-	// static FieldType getField() { return FieldHolder.field; }
 	/**
 	 * Provides the providers - wrapper around the LocationManager provider
 	 * facilities. Includes our Criteria and defines our policies
@@ -203,6 +213,7 @@ public final class LocationMonitor extends Monitor<Location, Position> {
 			return m.getBestProvider(CRITERIA, ENABLE);
 		}
 
+		@SuppressWarnings("synthetic-access")
 		static Status getProviderStatus(Context ctx, String s) {
 			if (s == null) return Status.NULL;
 			if (s.equals(LocationManager.GPS_PROVIDER)) return Status.GPS;
@@ -210,15 +221,23 @@ public final class LocationMonitor extends Monitor<Location, Position> {
 				// Check if wireless is enabled
 				WifiManager wm = (WifiManager) ctx
 					.getSystemService(Context.WIFI_SERVICE);
-				if (!wm.isWifiEnabled()) {
+				if (wm == null || !wm.isWifiEnabled()) {
 					return Status.NETWORK_NOT_ENABLED;
 				}
-				ConnectivityManager cm = (ConnectivityManager) ctx
-					.getSystemService(CONNECTIVITY_SERVICE);
-				Boolean isWifi = cm.getNetworkInfo(
-				// TODO : isConnectedOrConnecting ? long periods of no
-				// connection go unnoticed
-					ConnectivityManager.TYPE_WIFI).isConnectedOrConnecting();
+				Boolean isWifi = false;
+				WifiLock _wifiLock = null;
+				try {
+					_wifiLock = wm.createWifiLock(Net.modeHighPerformanse(),
+						WIFI_LOCK_TAG);
+					_wifiLock.acquire();
+					latch = new CountDownLatch(1);
+					WifiWaker ww = new WifiWaker(latch);
+					isWifi = ww.wakeWifiUpIfEnabled(ctx, LATCH_TIMEOUT);
+				} finally {
+					if (_wifiLock != null) {
+						_wifiLock.release();
+					}
+				}
 				if (isWifi) {
 					return Status.NETWORK;
 				}
@@ -329,31 +348,23 @@ public final class LocationMonitor extends Monitor<Location, Position> {
 	}
 
 	@Override
-	public long getInterval() {
+	public long getBaseInterval() {
 		return LOCATION_MONITORING_INTERVAL;
 	}
 
 	@Override
-	public void saveResults(Location data) throws FileNotFoundException,
-			IOException {
-		List<byte[]> listByteArrays = Position.LocationFields
-			.createListOfByteArrays(data);
-		Position.saveData(this, listByteArrays);
-		try {
-			final Position currentPosition = Position.fromBytes(listByteArrays);
-			if (!getPref(getManualUpdatePrefKey(), false)) { // not mess the intervals
-				// get the previous data from the preferences store
-				String previousData = getPref(LOCATION_DATA_KEY, null);
-				Position previousPosition = Position.fromString(previousData);
-				// check to see if we need to modify the interval
-				updateInterval(currentPosition, previousPosition);
-				// store the new data
-				putPref(LOCATION_DATA_KEY, currentPosition.stringForm());
-			}
-			putPref(dataKey(), currentPosition.toString());
-		} catch (ParserException e) {
-			w("Corrupted data", e);
+	void saveResults(Location data) throws IOException {
+		final Position currentPosition = Position.saveData(this, data);
+		if (!getPref(getManualUpdatePrefKey(), false)) {
+			// get the previous data from the preferences store
+			String previousData = getPref(LOCATION_DATA_KEY, null);
+			Position previousPosition = Position.fromString(previousData);
+			// check to see if we need to modify the interval
+			updateInterval(currentPosition, previousPosition);
+			// store the new data
+			putPref(LOCATION_DATA_KEY, currentPosition.stringForm());
 		}
+		putPref(dataKey(), currentPosition.toString());
 	}
 
 	public static String dataKey() {

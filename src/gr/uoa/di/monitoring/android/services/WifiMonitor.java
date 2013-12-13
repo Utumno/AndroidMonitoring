@@ -14,10 +14,8 @@ import gr.uoa.di.monitoring.android.R;
 import gr.uoa.di.monitoring.android.receivers.BaseReceiver;
 import gr.uoa.di.monitoring.android.receivers.ScanResultsReceiver;
 import gr.uoa.di.monitoring.android.receivers.WifiMonitoringReceiver;
-import gr.uoa.di.monitoring.model.ParserException;
 import gr.uoa.di.monitoring.model.Wifi;
 
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.List;
 
@@ -130,8 +128,9 @@ public final class WifiMonitor extends Monitor<List<ScanResult>, Wifi> {
 			synchronized (Gatekeeper.WIFI_MONITOR) {
 				if (done) {
 					if (!aborting) {
-						warnScanResults(sb);
-						save(wm().getScanResults());
+						final List<ScanResult> scanRes = wm().getScanResults();
+						warnScanResults(sb, scanRes);
+						save(scanRes);
 					}
 					disableWifiIfIhadItEnableMyself();
 					d("Releasing wake lock for the scan");
@@ -298,17 +297,16 @@ public final class WifiMonitor extends Monitor<List<ScanResult>, Wifi> {
 			initiatedWifiEnable);
 	}
 
-	private void warnScanResults(StringBuilder sb) {
-		List<ScanResult> scanRes = wm().getScanResults();
+	private void warnScanResults(StringBuilder sb, List<ScanResult> scanRes) {
 		if (scanRes == null) {
-			// will be null if wireless is disabled
-			// TODO : only then ???
+			// will be null if wireless is disabled OR enabled and fallen asleep
+			// http://stackoverflow.com/questions/16137268/
+			// wifimanager-getscanresults-clarifications-automatic-scans-sleep-etc
 			w("Scan results == null - wireless enabled : "
 				+ wm().isWifiEnabled());
 		} else {
 			if (scanRes.isEmpty()) {
 				w("No scan results available");
-				// TODO : do I have to report it ?
 			} else {
 				for (ScanResult scanResult : scanRes) {
 					sb.append(scanResult.SSID + DEBUG_DELIMITER);
@@ -329,7 +327,7 @@ public final class WifiMonitor extends Monitor<List<ScanResult>, Wifi> {
 	}
 
 	@Override
-	public long getInterval() {
+	public long getBaseInterval() {
 		return WIFI_MONITORING_INTERVAL;
 	}
 
@@ -390,26 +388,18 @@ public final class WifiMonitor extends Monitor<List<ScanResult>, Wifi> {
 	}
 
 	@Override
-	void saveResults(List<ScanResult> data) throws FileNotFoundException,
-			IOException {
-		List<List<byte[]>> listOfListsOfByteArrays = Wifi.WifiFields
-			.createListOfListsOfByteArrays(data);
-		Wifi.saveData(this, listOfListsOfByteArrays, Wifi.WifiFields.class);
-		try {
-			final Wifi currentWifi = Wifi.fromBytes(listOfListsOfByteArrays);
-			if (!getPref(getManualUpdatePrefKey(), false)) { // not mess the intervals
-				// get the previous data from the preferences store
-				String previousData = getPref(WIFI_DATA_KEY, null);
-				Wifi previousWifi = Wifi.fromString(previousData);
-				// check to see if we need to modify the interval
-				updateInterval(currentWifi, previousWifi);
-				// store the new data
-				putPref(WIFI_DATA_KEY, currentWifi.stringForm());
-			}
-			putPref(dataKey(), currentWifi.toString());
-		} catch (ParserException e) {
-			w("Corrupted data", e);
+	void saveResults(List<ScanResult> data) throws IOException {
+		final Wifi currentWifi = Wifi.saveData(this, data);
+		if (!getPref(getManualUpdatePrefKey(), false)) {
+			// get the previous data from the preferences store
+			String previousData = getPref(WIFI_DATA_KEY, null);
+			Wifi previousWifi = Wifi.fromString(previousData);
+			// check to see if we need to modify the interval
+			updateInterval(currentWifi, previousWifi);
+			// store the new data
+			putPref(WIFI_DATA_KEY, currentWifi.stringForm());
 		}
+		putPref(dataKey(), currentWifi.toString());
 	}
 
 	public static String dataKey() {
@@ -419,6 +409,7 @@ public final class WifiMonitor extends Monitor<List<ScanResult>, Wifi> {
 	public static String updateInProgressKey() {
 		return WIFI_UPDATE_IN_PROGRESS_KEY;
 	}
+
 	@Override
 	String getLastResultsPrefKey() {
 		return WIFI_DATA_KEY;

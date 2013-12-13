@@ -7,7 +7,7 @@ import android.view.ViewGroup;
 
 import gr.uoa.di.monitoring.android.R;
 
-public class MonitorPrefsFragment extends BaseFragment {
+public final class MonitorPrefsFragment extends BaseFragment {
 
 	@Override
 	public View onCreateView(LayoutInflater inflater, ViewGroup container,

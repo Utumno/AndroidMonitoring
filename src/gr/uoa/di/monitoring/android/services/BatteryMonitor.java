@@ -6,11 +6,8 @@ import android.os.BatteryManager;
 
 import gr.uoa.di.monitoring.android.receivers.BatteryMonitoringReceiver;
 import gr.uoa.di.monitoring.model.Battery;
-import gr.uoa.di.monitoring.model.ParserException;
 
-import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.util.List;
 
 import static gr.uoa.di.monitoring.android.C.ac_aborting;
 
@@ -55,7 +52,7 @@ public final class BatteryMonitor extends Monitor<Intent, Battery> {
 	}
 
 	@Override
-	public long getInterval() {
+	public long getBaseInterval() {
 		return BATTERY_MONITORING_INTERVAL;
 	}
 
@@ -65,25 +62,18 @@ public final class BatteryMonitor extends Monitor<Intent, Battery> {
 	}
 
 	@Override
-	void saveResults(Intent data) throws FileNotFoundException, IOException {
-		List<byte[]> listByteArrays = Battery.BatteryFields
-			.createListOfByteArrays(data);
-		Battery.saveData(this, listByteArrays);
-		try {
-			final Battery currentBattery = Battery.fromBytes(listByteArrays);
-			if (!getPref(getManualUpdatePrefKey(), false)) { // not mess the intervals
-				// get the previous data from the preferences store
-				String previousData = getPref(BATTERY_DATA_KEY, null);
-				Battery previousBattery = Battery.fromString(previousData);
-				// check to see if we need to modify the interval
-				updateInterval(currentBattery, previousBattery);
-				// store the new data
-				putPref(BATTERY_DATA_KEY, currentBattery.stringForm());
-			}
-			putPref(dataKey(), currentBattery.toString());
-		} catch (ParserException e) {
-			w("Corrupted data", e);
+	void saveResults(Intent data) throws IOException {
+		final Battery currentBattery = Battery.saveData(this, data);
+		if (!getPref(getManualUpdatePrefKey(), false)) {
+			// get the previous data from the preferences store
+			String previousData = getPref(BATTERY_DATA_KEY, null);
+			Battery previousBattery = Battery.fromString(previousData);
+			// check to see if we need to modify the interval
+			updateInterval(currentBattery, previousBattery);
+			// store the new data
+			putPref(BATTERY_DATA_KEY, currentBattery.stringForm());
 		}
+		putPref(dataKey(), currentBattery.toString());
 	}
 
 	public static String dataKey() {

@@ -38,7 +38,7 @@ import static gr.uoa.di.monitoring.android.C.DEBUG;
  * href="http://developer.android.com/guide/topics/ui/settings.html">Settings
  * API Guide</a> for more information on developing a Settings UI.
  */
-public class SettingsActivity extends PreferenceActivity {
+public final class SettingsActivity extends PreferenceActivity {
 
 	/**
 	 * Determines whether to always show the simplified settings UI, where
@@ -176,8 +176,11 @@ public class SettingsActivity extends PreferenceActivity {
 	 * http://developer
 	 * .android.com/reference/android/preference/PreferenceActivity.html) -> IE
 	 * this is called automatically - reads the R.xml.pref_headers and freaking
-	 * creates the 2 panes view - it was driving me mad - @inheritDoc my ***
-	 * TODO : How come it does not crash in Froyo
+	 * creates the 2 panes view - it was driving me mad - @inheritDoc my *** It
+	 * does not crash in Froyo cause isSimplePreferences is always true in
+	 * Build.VERSION.SDK_INT < Build.VERSION_CODES.HONEYCOMB - @Override has
+	 * nothing to do with runtime and of course on Froyo this is never called by
+	 * the system (since it does not exist)
 	 */
 	@Override
 	@TargetApi(Build.VERSION_CODES.HONEYCOMB)

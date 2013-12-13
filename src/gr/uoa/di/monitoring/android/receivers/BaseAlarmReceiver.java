@@ -74,7 +74,7 @@ public abstract class BaseAlarmReceiver extends BaseReceiver {
 				am.setInexactRepeating(AlarmManager.ELAPSED_REALTIME_WAKEUP,
 					SystemClock.elapsedRealtime()
 						+ AlarmService.getInitialDelay(),
-					monitor_class_.newInstance().getInterval(), pi);
+					monitor_class_.newInstance().getBaseInterval(), pi);
 			} catch (InstantiationException e) {
 				// should not happen
 				throw new IllegalStateException(UNABLE_TO_SET_ALARMS, e);

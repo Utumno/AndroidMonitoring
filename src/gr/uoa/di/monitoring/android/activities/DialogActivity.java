@@ -1,8 +1,11 @@
 package gr.uoa.di.monitoring.android.activities;
 
+import android.annotation.TargetApi;
 import android.content.ActivityNotFoundException;
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
+import android.os.Build;
 import android.os.Bundle;
 import android.view.Menu;
 import android.view.View;
@@ -13,19 +16,22 @@ import gr.uoa.di.monitoring.android.R;
 
 import static gr.uoa.di.monitoring.android.C.launchActivityIntent;
 
-public class DialogActivity extends BaseActivity implements OnClickListener {
+public final class DialogActivity extends BaseActivity implements
+		OnClickListener {
 
 	private final static int[] BUTTONS = { R.id.dialog_activity_yes_button,
 			R.id.dialog_activity_no_button };
 	private final static String DIALOG_TITLE_KEY = "Title";
 	private final static String DIALOG_TEXT_KEY = "Text";
 	private final static String DIALOG_INTENT_KEY = "Intent";
+	// should be final but they are provided in the intent available in onCreate
 	private String mTitle;
 	private String mText;
-	private Intent mIntent;
+	private Intent mIntentToLaunchOnYes;
 	private final static String TAG = DialogActivity.class.getName();
 
 	@Override
+	@TargetApi(Build.VERSION_CODES.HONEYCOMB)
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
 		setContentView(R.layout.activity_dialog);
@@ -43,27 +49,54 @@ public class DialogActivity extends BaseActivity implements OnClickListener {
 		}
 		mTitle = b.getString(DIALOG_TITLE_KEY);
 		mText = b.getString(DIALOG_TEXT_KEY);
-		mIntent = b.getParcelable(DIALOG_INTENT_KEY);
+		mIntentToLaunchOnYes = b.getParcelable(DIALOG_INTENT_KEY);
 		setTitle(mTitle);
 		TextView tv = (TextView) findViewById(R.id.dialog_text);
 		tv.setText(mText);
-		// this.setFinishOnTouchOutside(false); // TODO : API check
+		if (android.os.Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB)
+			this.setFinishOnTouchOutside(true);
+		// default is probably false
+		// :http://androidxref.com/4.0.3_r1/xref/frameworks/base/core/java/android/view/Window.java#123
 	}
 
-	// TODO : better API, more null pointers - a builder maybe ?
-	public static Bundle setDialogTitle(Bundle b, String s) {
-		b.putString(DIALOG_TITLE_KEY, s);
-		return b;
-	}
+	private static final class IntentBuilder {
 
-	public static Bundle setDialogText(Bundle b, String s) {
-		b.putString(DIALOG_TEXT_KEY, s);
-		return b;
-	}
+		private final Bundle extras = new Bundle();
 
-	public static Bundle setDialogIntent(Bundle b, Intent s) {
-		b.putParcelable(DIALOG_INTENT_KEY, s);
-		return b;
+		IntentBuilder() {}
+
+		IntentBuilder dialogTitle(String s) {
+			extras.putString(DIALOG_TITLE_KEY, s);
+			return this;
+		}
+
+		IntentBuilder dialogText(String s) {
+			extras.putString(DIALOG_TEXT_KEY, s);
+			return this;
+		}
+
+		IntentBuilder dialogIntent(Intent intentToLaunchOnYes) {
+			extras.putParcelable(DIALOG_INTENT_KEY, intentToLaunchOnYes);
+			return this;
+		}
+
+		/**
+		 * Returns an intent which can be used to launch a Dialog activity
+		 *
+		 * @param ctx
+		 *            a Context from which the actual package name will be
+		 *            retrieved (from docs of
+		 *            {@link ComponentName#ComponentName(Context, Class)}
+		 * @return an intent used to fire the specified Dialog activity
+		 * @throws NullPointerException
+		 *             if ctx is null
+		 */
+		Intent build(Context ctx) {
+			// no need for defensive copying I guess
+			final Intent i = launchActivityIntent(ctx, DialogActivity.class);
+			i.putExtras(extras);
+			return i;
+		}
 	}
 
 	@Override
@@ -78,7 +111,7 @@ public class DialogActivity extends BaseActivity implements OnClickListener {
 		switch (v.getId()) {
 		case R.id.dialog_activity_yes_button:
 			try {
-				DialogActivity.this.startActivity(mIntent);
+				DialogActivity.this.startActivity(mIntentToLaunchOnYes);
 			} catch (ActivityNotFoundException e) {
 				// see http://stackoverflow.com/questions/20018082/
 				// safeguard-against-a-matching-activity-may-not-exist
@@ -86,8 +119,8 @@ public class DialogActivity extends BaseActivity implements OnClickListener {
 				w("The activity was not found" + e.getMessage());
 				// not much can be done - maybe display a toast...
 			}
-			finish(); // TODO : launch another activity (my Settings activity)
-			// check CATEGORY_PREFERENCE ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+			finish(); // TODO : wait for result and launch another activity (my
+			// Settings activity) - check CATEGORY_PREFERENCE ^^^^^^^^^^^^^^^^^^
 			break;
 		case R.id.dialog_activity_no_button:
 			finish();
@@ -98,14 +131,8 @@ public class DialogActivity extends BaseActivity implements OnClickListener {
 	public static Intent launchDialogActivityIntent(Context ctx,
 			final String title, final String text,
 			final Intent intentToLaunchOnYes) {
-		Bundle extras = new Bundle();
-		extras = setDialogText(extras, text);
-		extras = setDialogTitle(extras, title);
-		extras = setDialogIntent(extras, intentToLaunchOnYes);
-		final Class<DialogActivity> cls = DialogActivity.class;
-		final Intent i = launchActivityIntent(ctx, cls);
-		i.putExtras(extras);
-		return i;
+		return new IntentBuilder().dialogText(text).dialogTitle(title)
+			.dialogIntent(intentToLaunchOnYes).build(ctx);
 	}
 	// directly launches a Dialog Activity
 	// public static void launchDialogActivity(Context ctx, final String title,

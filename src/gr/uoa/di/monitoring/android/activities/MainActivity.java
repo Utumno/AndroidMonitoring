@@ -21,7 +21,7 @@ import static gr.uoa.di.monitoring.android.C.DATA_PREFS_KEY_INTENT_KEY;
 import static gr.uoa.di.monitoring.android.C.START_SERVICE_INTENT_INTENT_KEY;
 import static gr.uoa.di.monitoring.android.C.UPDATE_IN_PROGRESS_INTENT_KEY;
 
-public class MainActivity extends BaseActivity implements OnClickListener {
+public final class MainActivity extends BaseActivity implements OnClickListener {
 
 	private final static int[] BUTTONS = { R.id.battery_button,
 			R.id.gps_button, R.id.wifi_button };

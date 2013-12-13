@@ -11,7 +11,8 @@ import android.provider.Settings;
 import android.support.v4.app.NotificationCompat;
 import android.util.Log;
 
-import gr.uoa.di.android.helpers.FileIO;
+import gr.uoa.di.android.helpers.files.ExternalStorage;
+import gr.uoa.di.android.helpers.files.Writer;
 import gr.uoa.di.java.helpers.Utils;
 
 import java.io.File;
@@ -86,7 +87,8 @@ public final class C {
 	 * @throws IOException
 	 */
 	public static File logFile() throws IOException {
-		return FileIO.fileExternalPublicStorage(LOG_DIR, LOG_FILE, null);
+		return ExternalStorage.fileExternalPublicStorage(LOG_DIR, LOG_FILE,
+			null);
 	}
 
 	/**
@@ -262,7 +264,7 @@ public final class C {
 			// sRootFolder, fileName());
 			// FileIO.append(outputFile, msg + "\n", LOG_CHARSET_NAME);
 			File outputFile = logFile();
-			FileIO.append(outputFile, msg + "\n", LOG_CHARSET_NAME);
+			Writer.append(outputFile, msg + "\n", LOG_CHARSET_NAME);
 		} catch (FileNotFoundException e) {
 			Log.w(tag, e.getMessage());
 		} catch (IOException e) {

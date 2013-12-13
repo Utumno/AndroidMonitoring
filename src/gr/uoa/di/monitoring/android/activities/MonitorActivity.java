@@ -19,7 +19,7 @@ import static gr.uoa.di.monitoring.android.C.MANUAL_UPDATE_INTENT_KEY;
 import static gr.uoa.di.monitoring.android.C.START_SERVICE_INTENT_INTENT_KEY;
 import static gr.uoa.di.monitoring.android.C.UPDATE_IN_PROGRESS_INTENT_KEY;
 
-public class MonitorActivity extends FragmentActivity implements
+public final class MonitorActivity extends FragmentActivity implements
 		OnClickListener {
 
 	// constants - but I need a context to retrieve them
@@ -30,7 +30,7 @@ public class MonitorActivity extends FragmentActivity implements
 	private Intent monitorActivityIntent;
 	// depend on particular intent used to start the activity up
 	private static String dataKey; // static cause is needed in callbacks
-	private String updateInProgressKey;
+	private static String updateInProgressKey;
 	private Intent serviceIntent;
 	// set on resume - static cause needed in callbacks
 	private static TextView dataTextView; // null this onPause() to avoid a leak
@@ -65,6 +65,10 @@ public class MonitorActivity extends FragmentActivity implements
 	}
 
 	public static synchronized void onDataUpdated(Context ctx) {
+		if (updateInProgressKey == null) return;
+		Boolean isUpdating = AccessPreferences.get(ctx, updateInProgressKey,
+			false);
+		if (isUpdating) return; // our monitor is still updating
 		if (dataTextView != null && dataKey != null)
 			dataTextView.setText(AccessPreferences.get(ctx, dataKey,
 				defaultNoDataText));
@@ -74,7 +78,11 @@ public class MonitorActivity extends FragmentActivity implements
 		}
 	}
 
-	public static synchronized void onUpdating() {
+	public static synchronized void onUpdating(Context ctx) {
+		if (updateInProgressKey == null) return;
+		Boolean isUpdating = AccessPreferences.get(ctx, updateInProgressKey,
+			false);
+		if (!isUpdating) return;
 		if (dataTextView != null) dataTextView.setText(defaultUpdatingText);
 		if (updateButton != null) {
 			updateButton.setEnabled(false);
