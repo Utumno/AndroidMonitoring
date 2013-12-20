@@ -77,6 +77,10 @@
             android:enabled="false" >
         </receiver>
         <receiver
+            android:name=".receivers.LatchReceiver"
+            android:enabled="false" >
+        </receiver>
+        <receiver
             android:name=".receivers.ScanResultsReceiver"
             android:enabled="false" >
             <intent-filter>
@@ -89,6 +93,7 @@
         <service android:name=".services.LocationMonitor" />
         <service android:name=".services.WifiMonitor$Gatekeeper" />
         <service android:name=".services.NetworkService" />
+        <service android:name=".services.LatchService" />
         <activity
             android:name="gr.uoa.di.monitoring.android.activities.DialogActivity"
             android:label="@string/title_activity_dialog"

@@ -17,6 +17,7 @@ import gr.uoa.di.monitoring.android.receivers.BaseAlarmReceiver;
 import gr.uoa.di.monitoring.android.receivers.BaseReceiver;
 import gr.uoa.di.monitoring.android.receivers.BatteryLowReceiver;
 import gr.uoa.di.monitoring.android.receivers.BatteryMonitoringReceiver;
+import gr.uoa.di.monitoring.android.receivers.LatchReceiver;
 import gr.uoa.di.monitoring.android.receivers.LocationMonitoringReceiver;
 import gr.uoa.di.monitoring.android.receivers.NetworkReceiver;
 import gr.uoa.di.monitoring.android.receivers.TriggerMonitoringBootReceiver;
@@ -52,6 +53,7 @@ public abstract class Monitor<K, Y extends Data> extends AlarmService {
 		SETUP_ALARM_RECEIVERS.add(WifiMonitoringReceiver.class);
 		SETUP_ALARM_RECEIVERS.add(LocationMonitoringReceiver.class);
 		SETUP_ALARM_RECEIVERS.add(NetworkReceiver.class);
+		SETUP_ALARM_RECEIVERS.add(LatchReceiver.class);
 		RECEIVERS.addAll(SETUP_ALARM_RECEIVERS);
 		RECEIVERS.add(TriggerMonitoringBootReceiver.class);
 		RECEIVERS.add(BatteryLowReceiver.class); // TODO : separate treatment
