@@ -37,7 +37,8 @@ public abstract class BaseAlarmReceiver extends BaseReceiver {
 	// could be in method setupAlarm()
 	private PendingIntent pi;
 	private AlarmManager am; // static ? final ?
-	private static final String UNABLE_TO_SET_ALARMS = "Unable to set the alarms up";
+	private static final String UNABLE_TO_SET_ALARMS = "Unable to set the "
+		+ "alarms up";
 	// constants
 	private static final int NOT_USED = 0;
 
@@ -77,10 +78,10 @@ public abstract class BaseAlarmReceiver extends BaseReceiver {
 					monitor_class_.newInstance().getBaseInterval(), pi);
 			} catch (InstantiationException e) {
 				// should not happen
-				throw new IllegalStateException(UNABLE_TO_SET_ALARMS, e);
+				throw new RuntimeException(UNABLE_TO_SET_ALARMS, e);
 			} catch (IllegalAccessException e) {
 				// should not happen
-				throw new IllegalStateException(UNABLE_TO_SET_ALARMS, e);
+				throw new RuntimeException(UNABLE_TO_SET_ALARMS, e);
 			}
 		} else {
 			// send message to the monitors that the party is over
@@ -108,10 +109,10 @@ public abstract class BaseAlarmReceiver extends BaseReceiver {
 				currentInterval, pi);
 		} catch (InstantiationException e) {
 			// should not happen
-			throw new IllegalStateException(UNABLE_TO_SET_ALARMS, e);
+			throw new RuntimeException(UNABLE_TO_SET_ALARMS, e);
 		} catch (IllegalAccessException e) {
 			// should not happen
-			throw new IllegalStateException(UNABLE_TO_SET_ALARMS, e);
+			throw new RuntimeException(UNABLE_TO_SET_ALARMS, e);
 		}
 		d("alarms rescheduled " + monitoringIntent);
 	}

@@ -1,7 +1,11 @@
 package gr.uoa.di.monitoring.android.activities;
 
 import android.annotation.TargetApi;
+import android.app.ProgressDialog;
+import android.content.BroadcastReceiver;
 import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.res.Configuration;
 import android.media.Ringtone;
 import android.media.RingtoneManager;
@@ -26,6 +30,7 @@ import gr.uoa.di.monitoring.android.services.Monitor;
 import java.util.List;
 
 import static gr.uoa.di.monitoring.android.C.DEBUG;
+import static gr.uoa.di.monitoring.android.C.ac_monitoring_aborted;
 
 /**
  * A {@link PreferenceActivity} that presents a set of application settings. On
@@ -53,8 +58,59 @@ public final class SettingsActivity extends PreferenceActivity {
 	private static Preference master_pref;
 	// debug preferences
 	private static final int PREF_RESOURCE = R.xml.pref_general;
-	private static int PREF_RESOURCE_SETTINGS = (DEBUG) ? R.xml.pref_data_sync_debug
-			: R.xml.pref_data_sync;
+	private static int PREF_RESOURCE_SETTINGS = (DEBUG)
+			? R.xml.pref_data_sync_debug : R.xml.pref_data_sync;
+	// dialog (enabling disabling)
+	private static ProgressDialog dialog;
+	// Receiver
+	private BroadcastReceiver receiver = new BroadcastReceiver() {
+
+		@Override
+		public void onReceive(Context context, Intent intent) {
+			if (ac_monitoring_aborted.equals(intent.getAction())) {
+				reloadPrefs();
+			}
+		}
+	};
+
+	public static void cancelDialog() {
+		if (dialog != null) {
+			dialog.dismiss();
+			dialog = null;
+		}
+	}
+
+	@TargetApi(Build.VERSION_CODES.HONEYCOMB)
+	@SuppressWarnings("deprecation")
+	private void reloadPrefs() {
+		// on a multipane environment setupSimplePreferencesScreen() won't be
+		// called and onBuildHeaders won't be called and this will result in an
+		// exception - but happily setupSimplePreferencesScreen() will be called
+		// on pre HONEYCOMB while after HONEYCOMB we have recreate()
+		if (!isSimplePreferences(this)) {
+			recreate();
+			// onBuildHeaders(target);
+		} else {
+			setPreferenceScreen(null);
+			setupSimplePreferencesScreen();
+		}
+		// onContentChanged(); // not needed
+		master_pref.setOnPreferenceChangeListener(listener);
+	}
+
+	@Override
+	protected void onStart() {
+		super.onStart();
+		registerReceiver(receiver,
+			new IntentFilter(ac_monitoring_aborted.toString()));
+	}
+
+	@Override
+	protected void onStop() {
+		// may not be called in Froyo
+		unregisterReceiver(receiver);
+		super.onStop();
+	}
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
@@ -69,6 +125,7 @@ public final class SettingsActivity extends PreferenceActivity {
 		// TODO : why onPostCreate
 		super.onPostCreate(savedInstanceState);
 		setupSimplePreferencesScreen();
+		master_pref.setOnPreferenceChangeListener(listener);
 		// findPreference will return null if setupSimplePreferencesScreen
 		// hasn't run
 	}
@@ -87,10 +144,7 @@ public final class SettingsActivity extends PreferenceActivity {
 		// boolean checked = ((CheckBoxPreference) master_pref).isChecked();
 		// Log.w(TAG, "onResume - master pref : " + checked);
 		// ((CheckBoxPreference) master_pref).setChecked(enable);
-		setPreferenceScreen(null);
-		setupSimplePreferencesScreen();
-		// onContentChanged(); // not needed
-		master_pref.setOnPreferenceChangeListener(listener);
+		// reloadPrefs();
 		// bindCheckBoxPreferenceSummaryToValue(master_pref); // LOL only 1 list
 	}
 
@@ -101,18 +155,12 @@ public final class SettingsActivity extends PreferenceActivity {
 		// FIXME unregister ????
 	}
 
-	@Override
-	protected void onRestart() {
-		super.onRestart();
-		setPreferenceScreen(null);
-		setupSimplePreferencesScreen();
-	}
-
 	/**
 	 * Shows the simplified settings UI if the device configuration if the
 	 * device configuration dictates that a simplified, single-pane UI should be
 	 * shown.
 	 */
+	@SuppressWarnings("deprecation")
 	private void setupSimplePreferencesScreen() {
 		if (!isSimplePreferences(this)) {
 			return;
@@ -130,8 +178,6 @@ public final class SettingsActivity extends PreferenceActivity {
 		getPreferenceScreen().addPreference(fakeHeader);
 		addPreferencesFromResource(PREF_RESOURCE_SETTINGS);
 		master_pref = findPreference(master_enable.toString());
-		// FIXME : when changing the master enable pref the value is not updated
-		// if the PreferenceActivity is visible in the background
 		// bindPreferenceSummaryToValue(master_pref); // this throws ClassCast
 		// Bind the summaries of EditText/List/Dialog/Ringtone preferences to
 		// their values. When their values change, their summaries are updated
@@ -150,8 +196,11 @@ public final class SettingsActivity extends PreferenceActivity {
 	 * Helper method to determine if the device has an extra-large screen. For
 	 * example, 10" tablets are extra-large.
 	 */
+	@TargetApi(Build.VERSION_CODES.GINGERBREAD)
 	private static boolean isXLargeTablet(Context context) {
-		return (context.getResources().getConfiguration().screenLayout & Configuration.SCREENLAYOUT_SIZE_MASK) >= Configuration.SCREENLAYOUT_SIZE_XLARGE;
+		return (context.getResources().getConfiguration().screenLayout &
+				Configuration.SCREENLAYOUT_SIZE_MASK)
+				>= Configuration.SCREENLAYOUT_SIZE_XLARGE;
 	}
 
 	/**
@@ -185,6 +234,7 @@ public final class SettingsActivity extends PreferenceActivity {
 	@Override
 	@TargetApi(Build.VERSION_CODES.HONEYCOMB)
 	public void onBuildHeaders(List<Header> target) {
+		// Log.w("TARGET!!!!", target + "");
 		if (!isSimplePreferences(this)) {
 			loadHeadersFromResource(R.xml.pref_headers, target);
 		}
@@ -205,9 +255,8 @@ public final class SettingsActivity extends PreferenceActivity {
 				ListPreference listPreference = (ListPreference) preference;
 				int index = listPreference.findIndexOfValue(stringValue);
 				// Set the summary to reflect the new value.
-				preference
-					.setSummary(index >= 0 ? listPreference.getEntries()[index]
-							: null);
+				preference.setSummary(index >= 0
+						? listPreference.getEntries()[index] : null);
 			} else if (preference instanceof RingtonePreference) {
 				// For ringtone preferences, look up the correct display value
 				// using RingtoneManager.
@@ -256,18 +305,20 @@ public final class SettingsActivity extends PreferenceActivity {
 	private class ToggleMonitoringListener implements
 			OnPreferenceChangeListener {
 
+		ToggleMonitoringListener() {}
+
 		@Override
-		public boolean onPreferenceChange(Preference preference, Object newValue) {
+		public boolean
+				onPreferenceChange(Preference preference, Object newValue) {
 			if (newValue instanceof Boolean) {
-				boolean enable = (Boolean) newValue;
-				Monitor.enableMonitoring(getApplicationContext(), enable);
+				final boolean enable = (Boolean) newValue;
 				Log.v(TAG, "!master enable : " + enable);
-				boolean b = (Boolean) newValue;
+				dialog = ProgressDialog.show(SettingsActivity.this, "",
+					((enable) ? "Enabling" : "Disabling") + " monitoring.");
+				Monitor.enableMonitoring(getApplicationContext(), enable);
 				final CheckBoxPreference p = (CheckBoxPreference) preference;
-				preference.setSummary((b) ? p.getSummaryOn() : p
+				preference.setSummary((enable) ? p.getSummaryOn() : p
 					.getSummaryOff());
-				// TODO : display dialog and wait till preference
-				// enabled/disabled
 				return true;
 			}
 			return false;
@@ -327,7 +378,7 @@ public final class SettingsActivity extends PreferenceActivity {
 		@Override
 		public void onCreate(Bundle savedInstanceState) {
 			super.onCreate(savedInstanceState);
-			addPreferencesFromResource(R.xml.pref_data_sync);
+			addPreferencesFromResource(PREF_RESOURCE_SETTINGS);
 			// Bind the summaries of EditText/List/Dialog/Ringtone preferences
 			// to their values. When their values change, their summaries are
 			// updated to reflect the new value, per the Android Design

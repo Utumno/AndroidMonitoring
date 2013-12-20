@@ -34,7 +34,8 @@ public abstract class BaseReceiver extends BroadcastReceiver implements Logging 
 		PackageManager pacman = context.getPackageManager();
 		final ComponentName componentName = new ComponentName(context, receiver);
 		C.v(TAG, componentName.toString());
-		final int state = (enable) ? PackageManager.COMPONENT_ENABLED_STATE_ENABLED
+		final int state = (enable)
+				? PackageManager.COMPONENT_ENABLED_STATE_ENABLED
 				: PackageManager.COMPONENT_ENABLED_STATE_DISABLED;
 		pacman.setComponentEnabledSetting(componentName, state,
 			PackageManager.DONT_KILL_APP);

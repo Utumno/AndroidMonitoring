@@ -4,6 +4,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
 
 import com.commonsware.cwac.wakeful.WakefulIntentService;
@@ -11,6 +12,7 @@ import com.commonsware.cwac.wakeful.WakefulIntentService;
 import gr.uoa.di.android.helpers.AccessPreferences;
 import gr.uoa.di.monitoring.android.R;
 import gr.uoa.di.monitoring.android.activities.MonitorActivity;
+import gr.uoa.di.monitoring.android.activities.SettingsActivity;
 import gr.uoa.di.monitoring.android.receivers.BaseAlarmReceiver;
 import gr.uoa.di.monitoring.android.receivers.BaseReceiver;
 import gr.uoa.di.monitoring.android.receivers.BatteryLowReceiver;
@@ -29,6 +31,7 @@ import static gr.uoa.di.monitoring.android.C.DISABLE;
 import static gr.uoa.di.monitoring.android.C.MANUAL_UPDATE_INTENT_KEY;
 import static gr.uoa.di.monitoring.android.C.ac_aborting;
 import static gr.uoa.di.monitoring.android.C.ac_cancel_alarm;
+import static gr.uoa.di.monitoring.android.C.ac_monitoring_aborted;
 import static gr.uoa.di.monitoring.android.C.ac_reschedule_alarm;
 import static gr.uoa.di.monitoring.android.C.ac_setup_alarm;
 import static gr.uoa.di.monitoring.android.C.cancelAllNotifications;
@@ -40,8 +43,8 @@ public abstract class Monitor<K, Y extends Data> extends AlarmService {
 	private static final List<Class<? extends BaseReceiver>> RECEIVERS = new ArrayList<Class<? extends BaseReceiver>>();
 	private static final List<Class<? extends BaseAlarmReceiver>> SETUP_ALARM_RECEIVERS = new ArrayList<Class<? extends BaseAlarmReceiver>>();
 	// subclasses fields - subclasses are final so those have default scope
-	/** Delimiter used to separate the items in debug prints */
 	private Handler handler;
+	/** Delimiter used to separate the items in debug prints */
 	static final String DEBUG_DELIMITER = "::";
 	private final Object update_status_lock_ = new Object();
 	static {
@@ -137,6 +140,14 @@ public abstract class Monitor<K, Y extends Data> extends AlarmService {
 			_setupCancelAlarms(ctx, enable);
 			_enableDisableReceivers(ctx, enable);
 		}
+		Handler UIHandler = new Handler(Looper.getMainLooper());
+		UIHandler.post(new Runnable() {
+
+			@Override
+			public void run() {
+				SettingsActivity.cancelDialog();
+			}
+		});
 	}
 
 	/**
@@ -151,10 +162,11 @@ public abstract class Monitor<K, Y extends Data> extends AlarmService {
 			// we do not care if an update is manual
 			String master_enable = ctx.getResources()
 				.getText(R.string.enable_monitoring_master_pref_key).toString();
-			if (!AccessPreferences.get(ctx, master_enable, DISABLE)) return; // already
-																				// disabled
+			if (!AccessPreferences.get(ctx, master_enable, DISABLE)) return;
 			AccessPreferences.put(ctx, master_enable, DISABLE);
 			enableMonitoring(ctx, DISABLE);
+			// let SettingsActivity know
+			ctx.sendBroadcast(new Intent(ac_monitoring_aborted.toString()));
 		}
 	}
 
@@ -230,6 +242,8 @@ public abstract class Monitor<K, Y extends Data> extends AlarmService {
 			else {
 				putPref(master_enable, DISABLE);
 				enableMonitoring(this, DISABLE);
+				// let SettingsActivity know
+				sendBroadcast(new Intent(ac_monitoring_aborted.toString()));
 			}
 		}
 	}
@@ -422,16 +436,16 @@ public abstract class Monitor<K, Y extends Data> extends AlarmService {
 			for (MonitoringInterval mon : MonitoringInterval.values()) {
 				if (mon.interval == interval) return mon;
 			}
-			throw new IllegalArgumentException("Where did you get this "
-				+ "interval from ?");
+			throw new IllegalArgumentException("Where did you get this ("
+				+ interval + ") interval from ?");
 		}
 
 		private MonitoringInterval lessOften() {
 			int ordinal = ordinal();
 			if (ordinal < values().length - 1) {
-				++ordinal;
+				return values()[++ordinal];
 			}
-			return values()[ordinal];
+			return this;
 		}
 	}
 }

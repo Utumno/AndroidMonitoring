@@ -120,7 +120,7 @@ public final class BatteryMonitor extends Monitor<Intent, Battery> {
 	}
 
 	@Override
-	void clearManualUpdateFlag(){
+	void clearManualUpdateFlag() {
 		putPref(BATTERY_MANUAL_UPDATE_KEY, false);
 	}
 }

@@ -30,11 +30,11 @@ public abstract class AlarmService extends WakefulIntentService implements
 	// =========================================================================
 	// Methods used by the subclasses
 	// =========================================================================
-	<T> void putPref(String key, T value) {
+	final <T> void putPref(String key, T value) {
 		AccessPreferences.put(this, key, value);
 	}
 
-	<T> T getPref(String key, T value) {
+	final <T> T getPref(String key, T value) {
 		return AccessPreferences.get(this, key, value);
 	}
 
@@ -43,7 +43,7 @@ public abstract class AlarmService extends WakefulIntentService implements
 	 *
 	 * @return a human readable current time
 	 */
-	String time() {
+	final static String time() {
 		return new Date(System.currentTimeMillis()).toString();
 	}
 

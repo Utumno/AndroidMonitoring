@@ -31,8 +31,9 @@ import static gr.uoa.di.monitoring.android.C.triggerDialogNotification;
 // TODO : HttpClient (for Froyo and Eclair) - see relevant session
 public final class NetworkService extends AlarmService {
 
-	private static final long SEND_DATA_INTERVAL = (BuildConfig.DEBUG) ? MonitoringInterval.FIVE
-		.getInterval() : AlarmManager.INTERVAL_HALF_DAY;
+	private static final long SEND_DATA_INTERVAL = (BuildConfig.DEBUG)
+			? MonitoringInterval.FIVE.getInterval()
+			: AlarmManager.INTERVAL_HALF_DAY;
 	private static final String NOTIFICATION_TAG = NetworkService.class
 		.getSimpleName() + ".Notification";
 	private static final int NOTIFICATION_ID = 9202;
