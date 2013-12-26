@@ -31,7 +31,6 @@ import static gr.uoa.di.monitoring.android.C.DISABLE;
 import static gr.uoa.di.monitoring.android.C.MANUAL_UPDATE_INTENT_KEY;
 import static gr.uoa.di.monitoring.android.C.ac_aborting;
 import static gr.uoa.di.monitoring.android.C.ac_cancel_alarm;
-import static gr.uoa.di.monitoring.android.C.ac_monitoring_aborted;
 import static gr.uoa.di.monitoring.android.C.ac_reschedule_alarm;
 import static gr.uoa.di.monitoring.android.C.ac_setup_alarm;
 import static gr.uoa.di.monitoring.android.C.cancelAllNotifications;
@@ -158,16 +157,14 @@ public abstract class Monitor<K, Y extends Data> extends AlarmService {
 	 * @param ctx
 	 */
 	public static void abort(Context ctx) {
+		// we do not care if an update is manual
+		String master_enable = ctx.getResources()
+			.getText(R.string.enable_monitoring_master_pref_key).toString();
 		synchronized (Monitor.class) {
-			// we do not care if an update is manual
-			String master_enable = ctx.getResources()
-				.getText(R.string.enable_monitoring_master_pref_key).toString();
 			if (!AccessPreferences.get(ctx, master_enable, DISABLE)) return;
 			AccessPreferences.put(ctx, master_enable, DISABLE);
-			enableMonitoring(ctx, DISABLE);
-			// let SettingsActivity know
-			ctx.sendBroadcast(new Intent(ac_monitoring_aborted.toString()));
 		}
+		enableMonitoring(ctx, DISABLE);
 	}
 
 	@Override
@@ -242,8 +239,6 @@ public abstract class Monitor<K, Y extends Data> extends AlarmService {
 			else {
 				putPref(master_enable, DISABLE);
 				enableMonitoring(this, DISABLE);
-				// let SettingsActivity know
-				sendBroadcast(new Intent(ac_monitoring_aborted.toString()));
 			}
 		}
 	}
@@ -254,7 +249,7 @@ public abstract class Monitor<K, Y extends Data> extends AlarmService {
 	 *
 	 * @return a StringBuilder containing the common info
 	 */
-	final StringBuilder debugHeader() {
+	final static StringBuilder debugHeader() {
 		StringBuilder sb = new StringBuilder();
 		// sb.append(System.currentTimeMillis() / 1000);
 		sb.append(time());
