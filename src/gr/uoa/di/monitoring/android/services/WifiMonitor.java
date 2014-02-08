@@ -100,12 +100,12 @@ public final class WifiMonitor extends Monitor<List<ScanResult>, Wifi> {
 					// ac_scan_wifi_enabled broadcasts
 					final boolean startScan = wm().startScan();
 					d("Start scan : " + startScan);
-					if (!startScan) done = true;
+					if (!startScan) done = aborting = true;
 				}
 			} else if (ac_scan_wifi_enabled.equals(action)) {
 				final boolean startScan = wm().startScan();
 				d("Start scan : " + startScan);
-				if (!startScan) done = true;
+				if (!startScan) done = aborting = true;
 			} else if (ac_scan_results_available.equals(action)) {
 				// got my results - got to release the lock BY ALL MEANS
 				done = true;
@@ -222,11 +222,11 @@ public final class WifiMonitor extends Monitor<List<ScanResult>, Wifi> {
 		keepNoteToDisableWireless(false);
 	}
 
-	public static class Gatekeeper extends WakefulIntentService {
+	public static final class Gatekeeper extends WakefulIntentService {
 
 		static volatile boolean release = false;
 		private static final String TAG = Gatekeeper.class.getSimpleName();
-		public static final Object WIFI_MONITOR = new Object();
+		static final Object WIFI_MONITOR = new Object();
 
 		public Gatekeeper() {
 			super(TAG);
@@ -241,10 +241,9 @@ public final class WifiMonitor extends Monitor<List<ScanResult>, Wifi> {
 		@Override
 		protected void doWakefulWork(Intent intent) {
 			synchronized (WIFI_MONITOR) {
-				if (DEBUG) Log.d(TAG, "Got in sync block !");
+				d("Got in sync block !");
 				if (!release && !getWifiLock(this).isHeld()) {
-					if (DEBUG)
-						Log.d(TAG, "Actually acquiring wake lock for the scan");
+					d("Actually acquiring wake lock for the scan");
 					getWifiLock(this).acquire();
 				}
 				// while release is false wait on the monitor - holding the
@@ -257,17 +256,20 @@ public final class WifiMonitor extends Monitor<List<ScanResult>, Wifi> {
 						// TODO Handle
 						e.printStackTrace();
 					}
-					if (DEBUG) Log.d(TAG, "Out of wait !");
+					d("Out of wait !");
 				}
-				if (DEBUG) Log.d(TAG, "Out of while !");
+				d("Out of while !");
 				if (getWifiLock(this).isHeld()) {
-					if (DEBUG)
-						Log.d(TAG, "Actually releasing wake lock for the scan");
+					d("Actually releasing wake lock for the scan");
 					getWifiLock(this).release();
 				}
 				Gatekeeper.release = false;
 				WIFI_MONITOR.notify();
 			}
+		}
+
+		private static void d(final String msg) {
+			if (DEBUG) Log.d(TAG, msg);
 		}
 	}
 

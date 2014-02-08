@@ -1,17 +1,19 @@
 package gr.uoa.di.monitoring.android.activities;
 
 import android.annotation.TargetApi;
-import android.app.ProgressDialog;
-import android.content.SharedPreferences;
-import android.content.SharedPreferences.OnSharedPreferenceChangeListener;
+import android.content.BroadcastReceiver;
+import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
 import android.preference.CheckBoxPreference;
 import android.preference.Preference;
 import android.preference.Preference.OnPreferenceChangeListener;
 import android.preference.PreferenceCategory;
 import android.preference.PreferenceFragment;
-import android.preference.PreferenceManager;
+import android.support.v4.content.LocalBroadcastManager;
 import android.util.Log;
 
 import gr.uoa.di.android.helpers.AccessPreferences;
@@ -19,30 +21,38 @@ import gr.uoa.di.monitoring.android.R;
 import gr.uoa.di.monitoring.android.services.Monitor;
 
 import static gr.uoa.di.monitoring.android.C.DEBUG;
+import static gr.uoa.di.monitoring.android.C.ac_toggling;
 
-public final class SettingsActivity extends BaseSettings implements
-		OnSharedPreferenceChangeListener {
+public final class SettingsActivity extends BaseSettings {
 
 	private static final int PREF_HEADERS_XML = R.xml.pref_headers;
-	private static CharSequence master_enable;
-	private OnPreferenceChangeListener listener;
-	private static CheckBoxPreference master_pref;
+	private static CharSequence sMasterKey;
+	private OnPreferenceChangeListener mManualListener;
+	private CheckBoxPreference mMasterPref;
 	private static final String TAG = SettingsActivity.class.getSimpleName();
-	private SharedPreferences sp;
+	// Receiver
+	/** If the master preference is changed externally this reacts */
+	private BroadcastReceiver mExternalChangeReceiver = new ExternalChangeReceiver();
+	private final static String TOGGLING_MONITORING_IN_PROGRESS = "TOGGLING_MONITORING_IN_PROGRESS";
 	/** Used as canvas for the simple preferences screen */
 	private static final int EMPTY_PREF_RESOURCE = R.xml.pref_empty;
 	// debug preferences
-	private static int PREF_RESOURCE_SETTINGS = (DEBUG)
+	private static final int PREF_RESOURCE_SETTINGS = (DEBUG)
 			? R.xml.pref_data_sync_debug : R.xml.pref_data_sync;
-	// dialog (enabling disabling)
-	private static ProgressDialog dialog;
+	// summaries
+	private static CharSequence sSummaryOn;
+	private static CharSequence sSummaryOff;
+	private static CharSequence sSummaryEnabling;
+	private static CharSequence sSummaryDisabling;
 
-	public static void cancelDialog() {
-		if (dialog != null) {
-			// add it to the receiver
-			dialog.dismiss();
-			dialog = null;
-		}
+	public static void notifyMonitoringStateChange(Context ctx,
+			CharSequence action, boolean isToggling) {
+		final LocalBroadcastManager lbm = LocalBroadcastManager
+			.getInstance(ctx);
+		Intent intent = new Intent(ctx, ExternalChangeReceiver.class);
+		intent.setAction(action.toString());
+		intent.putExtra(TOGGLING_MONITORING_IN_PROGRESS, isToggling);
+		lbm.sendBroadcastSync(intent);
 	}
 
 	@Override
@@ -51,56 +61,64 @@ public final class SettingsActivity extends BaseSettings implements
 	}
 
 	@Override
+	@SuppressWarnings("deprecation")
 	void buildSimplePreferences() {
 		// In the simplified UI, fragments are not used at all and we instead
 		// use the older PreferenceActivity APIs.
 		// THIS is a blank preferences layout - which I need so
 		// getPreferenceScreen() does not return null - so I can add a header -
 		// alternatively you can very well comment everything out apart from
-		// addPreferencesFromResource(R.xml.pref_data_sync);
+		// addPreferencesFromResource(PREF_RESOURCE_SETTINGS);
 		addPreferencesFromResource(EMPTY_PREF_RESOURCE);
 		// Add 'data and sync' preferences, and a corresponding header.
 		PreferenceCategory fakeHeader = new PreferenceCategory(this);
 		fakeHeader.setTitle(R.string.pref_header_data_sync);
 		getPreferenceScreen().addPreference(fakeHeader);
 		addPreferencesFromResource(PREF_RESOURCE_SETTINGS);
-		// bindPreferenceSummaryToValue(master_pref); // this throws ClassCast
-		// Bind the summaries of EditText/List/Dialog/Ringtone preferences to
-		// their values. When their values change, their summaries are updated
-		// to reflect the new value, per the Android Design guidelines.
-		// bindPreferenceSummaryToValue(findPreference("example_list"));
-		// bindPreferenceSummaryToValue(findPreference("sync_frequency"));
+		// this should be in onPostCreate - I just wanted to suppress all
+		// deprecation warnings in one go - REPEAT in FRAGMENT
+		sMasterKey = getResources().getText(
+			R.string.enable_monitoring_master_pref_key);
+		mMasterPref = (CheckBoxPreference) findPreference(sMasterKey.toString());
 	}
 
 	@Override
 	protected void onPostCreate(Bundle savedInstanceState) {
 		super.onPostCreate(savedInstanceState);
-		master_enable = getResources().getText(
-			R.string.enable_monitoring_master_pref_key);
-		listener = new ToggleMonitoringListener();
-		// DefaultSharedPreferences - register listener lest Monitor aborts
-		sp = PreferenceManager.getDefaultSharedPreferences(this);
-		sp.registerOnSharedPreferenceChangeListener(this);
-		master_pref = (CheckBoxPreference) findPreference(master_enable
-			.toString());
-	}
-
-	@Override
-	protected void onResume() {
-		super.onResume();
-		master_pref.setOnPreferenceChangeListener(listener); // no way to
+		Log.w(TAG, "onPostCretae()");
+		// summaries
+		sSummaryOn = getResources().getText(R.string.str_pref_monitor_on);
+		sSummaryOff = getResources().getText(R.string.str_pref_monitor_off);
+		sSummaryEnabling = getResources().getText(
+			R.string.pref_monitor_enabling);
+		sSummaryDisabling = getResources().getText(
+			R.string.pref_monitor_disabling);
+		refreshMasterPreference(false);
+		// listener
+		Log.w(TAG, "LISTENER");
+		mManualListener = new ToggleMonitoringListener();
+		mMasterPref.setOnPreferenceChangeListener(mManualListener); // no way to
 		// unregister, see: http://stackoverflow.com/a/20493608/281545 This
 		// listener reacts to *manual* updates - so no need to be active outside
-		// onResume()/onPause()
+		// onResume()/onPause() - but also no need to register it every Resume
 	}
 
 	@Override
-	protected void onDestroy() {
-		// may not be called (as onDestroy() is killable), but no leak,
-		// see: http://stackoverflow.com/a/20493608/281545
-		Log.w(TAG, "onDestroy()!!! - unregister");
-		sp.unregisterOnSharedPreferenceChangeListener(this);
-		super.onDestroy();
+	protected void onStart() {
+		super.onStart();
+		final LocalBroadcastManager lbm = LocalBroadcastManager
+			.getInstance(this);
+		lbm.registerReceiver(mExternalChangeReceiver, new IntentFilter(
+			ac_toggling.toString()));
+	}
+
+	@Override
+	protected void onStop() {
+		// may not be called in Froyo
+		final LocalBroadcastManager lbm = LocalBroadcastManager
+			.getInstance(this);
+		lbm.unregisterReceiver(mExternalChangeReceiver);
+		super.onStop();
 	}
 
 	/**
@@ -117,26 +135,72 @@ public final class SettingsActivity extends BaseSettings implements
 			.getName();
 
 		@Override
+		@SuppressWarnings("synthetic-access")
 		public boolean
 				onPreferenceChange(Preference preference, Object newValue) {
 			if (newValue instanceof Boolean) {
 				final boolean enable = (Boolean) newValue;
 				Log.v(TAG2, "!master enable : " + enable);
-				dialog = ProgressDialog.show(preference.getContext(), "",
-					((enable) ? "Enabling" : "Disabling") + " monitoring.");
+				AccessPreferences.put(preference.getContext(),
+					sMasterKey.toString(), enable);
+				SettingsActivity.notifyMonitoringStateChange(
+					preference.getContext(), ac_toggling, true);
 				Monitor.enableMonitoring(preference.getContext(), enable);
-				final CheckBoxPreference p = (CheckBoxPreference) preference;
-				preference.setSummary((enable) ? p.getSummaryOn() : p
-					.getSummaryOff());
 				return true;
 			}
 			return false;
 		}
 	}
 
+	private final class ExternalChangeReceiver extends BroadcastReceiver {
+
+		ExternalChangeReceiver() {}
+
+		@Override
+		@SuppressWarnings("synthetic-access")
+		public void onReceive(Context ctx, Intent intent) {
+			if (sMasterKey == null || mMasterPref == null) return; // if
+			// onPostReceive has not run this will be null
+			final String action = intent.getAction();
+			if (ac_toggling.equals(action)) {
+				final boolean isToggling = intent.getBooleanExtra(
+					TOGGLING_MONITORING_IN_PROGRESS, false);
+				Log.w(ExternalChangeReceiver.class.getSimpleName(),
+					"isToggling " + isToggling);
+				new Handler(ctx.getMainLooper()).post(new Runnable() {
+
+					@Override
+					public void run() {
+						mMasterPref.setEnabled(!isToggling);
+						refreshMasterPreference(isToggling);
+					}
+				});
+			}
+		}
+	}
+
 	/**
-	 * This fragment shows data and sync preferences only. It is used when the
-	 * activity is showing a two-pane settings UI.
+	 * Updating finished, set summaries and check/uncheck status
+	 *
+	 * @param transition
+	 *            if true we are in enabling/disabling
+	 */
+	private void refreshMasterPreference(boolean transition) {
+		final Boolean enabling = AccessPreferences.get(this,
+			sMasterKey.toString(), false);
+		mMasterPref.setChecked(enabling);
+		if (transition) {
+			mMasterPref.setSummary((enabling) ? sSummaryEnabling
+					: sSummaryDisabling);
+		} else {
+			// mMasterPref.setChecked(enabling);
+			mMasterPref.setSummary((enabling) ? sSummaryOn : sSummaryOff);
+		}
+	}
+
+	/**
+	 * This fragment is used when the activity is showing a two-pane settings
+	 * UI. Must be in sync with {@link #buildSimplePreferences}
 	 */
 	@TargetApi(Build.VERSION_CODES.HONEYCOMB)
 	public final static class DataSyncPreferenceFragment extends
@@ -145,34 +209,19 @@ public final class SettingsActivity extends BaseSettings implements
 		@Override
 		public void onCreate(Bundle savedInstanceState) {
 			super.onCreate(savedInstanceState);
-			Log.w(TAG, "onCreate");
 			addPreferencesFromResource(PREF_RESOURCE_SETTINGS);
-			master_pref = (CheckBoxPreference) findPreference(master_enable
+		}
+
+		@Override
+		@SuppressWarnings("synthetic-access")
+		public void onActivityCreated(Bundle savedInstanceState) {
+			Log.w("Fragment", "onActCR");
+			super.onActivityCreated(savedInstanceState);
+			SettingsActivity activity = (SettingsActivity) getActivity();
+			sMasterKey = getResources().getText(
+				R.string.enable_monitoring_master_pref_key);
+			activity.mMasterPref = (CheckBoxPreference) findPreference(sMasterKey
 				.toString());
-		}
-	}
-
-	@Override
-	public void onSharedPreferenceChanged(SharedPreferences sharedPreferences,
-			String key) {
-		if (master_enable == null || master_pref == null) return;
-		if (master_enable.toString().equals(key)) {
-			refreshMasterPreference();
-		}
-	}
-
-	/**
-	 * @param key
-	 */
-	private void refreshMasterPreference() {
-		final Boolean isMonitoringEnabled = AccessPreferences.get(this,
-			master_enable.toString(), false);
-		Log.w(TAG, "Stored value: " + isMonitoringEnabled);
-		final boolean needsRefresh = master_pref.isChecked() != isMonitoringEnabled;
-		if (needsRefresh) {
-			master_pref.setChecked(isMonitoringEnabled);
-			master_pref.setSummary((isMonitoringEnabled) ? master_pref
-				.getSummaryOn() : master_pref.getSummaryOff());
 		}
 	}
 }

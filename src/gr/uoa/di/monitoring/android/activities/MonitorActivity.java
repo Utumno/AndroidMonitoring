@@ -1,7 +1,8 @@
 package gr.uoa.di.monitoring.android.activities;
 
-import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
+import android.content.SharedPreferences.OnSharedPreferenceChangeListener;
 import android.os.Bundle;
 import android.support.v4.app.FragmentActivity;
 import android.view.Menu;
@@ -20,73 +21,68 @@ import static gr.uoa.di.monitoring.android.C.START_SERVICE_INTENT_INTENT_KEY;
 import static gr.uoa.di.monitoring.android.C.UPDATE_IN_PROGRESS_INTENT_KEY;
 
 public final class MonitorActivity extends FragmentActivity implements
-		OnClickListener {
+		OnClickListener, OnSharedPreferenceChangeListener {
 
 	// constants - but I need a context to retrieve them
-	private static String defaultNoDataText;
-	private static String defaultUpdatingText;
-	private static String updateButtonTxt;
+	private static String sDefaultNoDataText;
+	private static String sDefaultUpdatingText;
+	private static String sUpdateButtonTxt;
 	// intent and its dependent data
-	private Intent monitorActivityIntent;
+	private Intent mMonitorActivityIntent;
 	// depend on particular intent used to start the activity up
-	private static String dataKey; // static cause is needed in callbacks
-	private static String updateInProgressKey;
-	private Intent serviceIntent;
-	// set on resume - static cause needed in callbacks
-	private static TextView dataTextView; // null this onPause() to avoid a leak
-	private static Button updateButton; // null this onPause() to avoid a leak
+	private String mDataKey;
+	private String mUpdateInProgressKey;
+	private Intent mServiceIntent;
+	// set onStart()
+	private TextView mDataTextView;
+	private Button mUpdateButton;
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
 		setContentView(R.layout.activity_monitor);
 		// those are effectively final constants
-		defaultNoDataText = getResources().getString(
+		sDefaultNoDataText = getResources().getString(
 			R.string.default_data_no_data);
-		defaultUpdatingText = getResources().getString(
+		sDefaultUpdatingText = getResources().getString(
 			R.string.default_data_updating);
-		updateButtonTxt = getResources().getString(R.string.update_button_text);
+		sUpdateButtonTxt = getResources()
+			.getString(R.string.update_button_text);
 		// Intent driven
-		monitorActivityIntent = getIntent();
+		mMonitorActivityIntent = getIntent();
 		// intro - set once
 		final TextView introTextView = (TextView) findViewById(R.id.data_intro);
-		final String introText = monitorActivityIntent
+		final String introText = mMonitorActivityIntent
 			.getStringExtra(DATA_INTRO_INTENT_KEY);
 		introTextView.setText(introText);
 		// data
-		dataKey = monitorActivityIntent
+		mDataKey = mMonitorActivityIntent
 			.getStringExtra(DATA_PREFS_KEY_INTENT_KEY);
 		// see if update is in progress
-		updateInProgressKey = monitorActivityIntent
+		mUpdateInProgressKey = mMonitorActivityIntent
 			.getStringExtra(UPDATE_IN_PROGRESS_INTENT_KEY);
 		// the intent that starts the service
-		serviceIntent = (Intent) monitorActivityIntent
+		mServiceIntent = (Intent) mMonitorActivityIntent
 			.getParcelableExtra(START_SERVICE_INTENT_INTENT_KEY);
+		// and the "movable" parts
+		mDataTextView = (TextView) findViewById(R.id.data);
+		mUpdateButton = (Button) findViewById(R.id.update_data_button);
+		mUpdateButton.setOnClickListener(this); // no need to unregister methinks
 	}
 
-	public static synchronized void onDataUpdated(Context ctx) {
-		if (updateInProgressKey == null) return;
-		Boolean isUpdating = AccessPreferences.get(ctx, updateInProgressKey,
-			false);
-		if (isUpdating) return; // our monitor is still updating
-		if (dataTextView != null && dataKey != null)
-			dataTextView.setText(AccessPreferences.get(ctx, dataKey,
-				defaultNoDataText));
-		if (updateButton != null) {
-			updateButton.setText(updateButtonTxt);
-			updateButton.setEnabled(true);
-		}
-	}
-
-	public static synchronized void onUpdating(Context ctx) {
-		if (updateInProgressKey == null) return;
-		Boolean isUpdating = AccessPreferences.get(ctx, updateInProgressKey,
-			false);
-		if (!isUpdating) return;
-		if (dataTextView != null) dataTextView.setText(defaultUpdatingText);
-		if (updateButton != null) {
-			updateButton.setEnabled(false);
-			updateButton.setText(defaultUpdatingText);
+	@Override
+	public synchronized void onSharedPreferenceChanged(
+			SharedPreferences sharedPreferences, String key) {
+		if (mUpdateInProgressKey.equals(key)) {
+			final Boolean isUpdating = AccessPreferences.get(this,
+				mUpdateInProgressKey, false);
+			// set the data text
+			mDataTextView.setText((isUpdating) ? sDefaultUpdatingText
+					: AccessPreferences.get(this, mDataKey, sDefaultNoDataText));
+			// set the button right
+			mUpdateButton.setText((isUpdating) ? sDefaultUpdatingText
+					: sUpdateButtonTxt);
+			mUpdateButton.setEnabled(!isUpdating);
 		}
 	}
 
@@ -94,39 +90,27 @@ public final class MonitorActivity extends FragmentActivity implements
 	public void onClick(View v) {
 		switch (v.getId()) {
 		case R.id.update_data_button:
-			serviceIntent.putExtra(MANUAL_UPDATE_INTENT_KEY, true);
-			this.startService(serviceIntent);
+			mServiceIntent.putExtra(MANUAL_UPDATE_INTENT_KEY, true);
+			this.startService(mServiceIntent);
 		}
 	}
 
 	@Override
-	protected void onResume() {
-		super.onResume();
-		synchronized (MonitorActivity.class) {
-			Boolean isUpdating = AccessPreferences.get(this,
-				updateInProgressKey, false);
-			dataTextView = (TextView) findViewById(R.id.data);
-			updateButton = (Button) findViewById(R.id.update_data_button);
-			updateButton.setOnClickListener(this);
-			// set the data text
-			dataTextView.setText((isUpdating) ? defaultUpdatingText
-					: AccessPreferences.get(this, dataKey, defaultNoDataText));
-			// set the button right
-			updateButton.setText((isUpdating) ? defaultUpdatingText
-					: updateButtonTxt);
-			updateButton.setEnabled(!isUpdating);
-		}
+	protected void onStart() {
+		super.onStart();
+		AccessPreferences.registerListener(this, this);
+		AccessPreferences.callListener(this, this, mUpdateInProgressKey);
 	}
 
 	@Override
-	protected void onPause() {
-		synchronized (MonitorActivity.class) {
-			updateButton.setOnClickListener(null); // TODO : needed ??
-			dataTextView = updateButton = null; // to avoid leaking my activity
-		}
-		super.onPause();
+	protected void onStop() {
+		// may not be called (as onStop() is killable), but no leak,
+		// see: http://stackoverflow.com/a/20493608/281545
+		AccessPreferences.unregisterListener(this, this);
+		super.onStop();
 	}
 
+	// boilerplate
 	@Override
 	public boolean onCreateOptionsMenu(Menu menu) {
 		// Inflate the menu; this adds items to the action bar if it is present.

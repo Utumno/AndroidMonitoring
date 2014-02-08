@@ -2,8 +2,6 @@
 	<CheckBoxPreference
 		android:defaultValue="false"
 		android:key="@string/enable_monitoring_master_pref_key"
-		android:summary="@string/pref_enable_monitoring_summary"
-		android:summaryOff="@string/str_pref_monitor_off"
-		android:summaryOn="@string/str_pref_monitor_on"
-		android:title="@string/pref_enable_monitoring_title" />
+		android:title="@string/pref_enable_monitoring_title"
+		 />
 </PreferenceScreen>

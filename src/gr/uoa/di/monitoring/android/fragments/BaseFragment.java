@@ -6,12 +6,12 @@ import android.support.v4.app.Fragment;
 
 public class BaseFragment extends Fragment {
 
-	private Intent intent;
+	private Intent mIntent;
 
 	@Override
 	public void onAttach(Activity activity) {
 		// hopefully activity is THE activity
 		super.onAttach(activity);
-		intent = activity.getIntent();
+		mIntent = activity.getIntent();
 	}
 }

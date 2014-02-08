@@ -3,15 +3,12 @@ package gr.uoa.di.monitoring.android.services;
 import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
-import android.os.Handler;
-import android.os.Looper;
 import android.util.Log;
 
 import com.commonsware.cwac.wakeful.WakefulIntentService;
 
 import gr.uoa.di.android.helpers.AccessPreferences;
 import gr.uoa.di.monitoring.android.R;
-import gr.uoa.di.monitoring.android.activities.MonitorActivity;
 import gr.uoa.di.monitoring.android.activities.SettingsActivity;
 import gr.uoa.di.monitoring.android.receivers.BaseAlarmReceiver;
 import gr.uoa.di.monitoring.android.receivers.BaseReceiver;
@@ -33,6 +30,7 @@ import static gr.uoa.di.monitoring.android.C.ac_aborting;
 import static gr.uoa.di.monitoring.android.C.ac_cancel_alarm;
 import static gr.uoa.di.monitoring.android.C.ac_reschedule_alarm;
 import static gr.uoa.di.monitoring.android.C.ac_setup_alarm;
+import static gr.uoa.di.monitoring.android.C.ac_toggling;
 import static gr.uoa.di.monitoring.android.C.cancelAllNotifications;
 
 public abstract class Monitor<K, Y extends Data> extends AlarmService {
@@ -42,7 +40,6 @@ public abstract class Monitor<K, Y extends Data> extends AlarmService {
 	private static final List<Class<? extends BaseReceiver>> RECEIVERS = new ArrayList<Class<? extends BaseReceiver>>();
 	private static final List<Class<? extends BaseAlarmReceiver>> SETUP_ALARM_RECEIVERS = new ArrayList<Class<? extends BaseAlarmReceiver>>();
 	// subclasses fields - subclasses are final so those have default scope
-	private Handler handler;
 	/** Delimiter used to separate the items in debug prints */
 	static final String DEBUG_DELIMITER = "::";
 	private final Object update_status_lock_ = new Object();
@@ -58,12 +55,6 @@ public abstract class Monitor<K, Y extends Data> extends AlarmService {
 
 	public Monitor(String name) {
 		super(name);
-	}
-
-	@Override
-	public void onCreate() {
-		super.onCreate();
-		handler = new Handler();
 	}
 
 	// =========================================================================
@@ -127,6 +118,16 @@ public abstract class Monitor<K, Y extends Data> extends AlarmService {
 	// =========================================================================
 	// API
 	// =========================================================================
+	/**
+	 * This method enables or disables monitoring. It updates a Shared
+	 * Preference to notify UI that enabling/disabling is finished. It DOES NOT
+	 * update the master preference however - the caller is responsible for that
+	 *
+	 * @param ctx
+	 *            da context
+	 * @param enable
+	 *            true to enable false to disable
+	 */
 	public static void enableMonitoring(Context ctx, boolean enable) {
 		Log.d(TAG, "enableMonitoring : " + enable);
 		Log.d(TAG, "setup/cancel alarms : "
@@ -139,14 +140,7 @@ public abstract class Monitor<K, Y extends Data> extends AlarmService {
 			_setupCancelAlarms(ctx, enable);
 			_enableDisableReceivers(ctx, enable);
 		}
-		Handler UIHandler = new Handler(Looper.getMainLooper());
-		UIHandler.post(new Runnable() {
-
-			@Override
-			public void run() {
-				SettingsActivity.cancelDialog();
-			}
-		});
+		SettingsActivity.notifyMonitoringStateChange(ctx, ac_toggling, false);
 	}
 
 	/**
@@ -158,12 +152,11 @@ public abstract class Monitor<K, Y extends Data> extends AlarmService {
 	 */
 	public static void abort(Context ctx) {
 		// we do not care if an update is manual
-		String master_enable = ctx.getResources()
-			.getText(R.string.enable_monitoring_master_pref_key).toString();
 		synchronized (Monitor.class) {
-			if (!AccessPreferences.get(ctx, master_enable, DISABLE)) return;
-			AccessPreferences.put(ctx, master_enable, DISABLE);
+			if (!isMonitoringEnabled(ctx)) return;
+			setMonitoringPref(ctx, DISABLE);
 		}
+		SettingsActivity.notifyMonitoringStateChange(ctx, ac_toggling, true);
 		enableMonitoring(ctx, DISABLE);
 	}
 
@@ -180,6 +173,7 @@ public abstract class Monitor<K, Y extends Data> extends AlarmService {
 				sEClass);
 			Log.d(TAG, "setup/cancel alarms int : " + i);
 			ctx.sendBroadcast(i);
+			Thread.yield();
 		}
 	}
 
@@ -226,18 +220,18 @@ public abstract class Monitor<K, Y extends Data> extends AlarmService {
 	 */
 	final void abort() {
 		synchronized (Monitor.class) {
-			String master_enable = getResources().getText(
-				R.string.enable_monitoring_master_pref_key).toString();
-			if (!getPref(master_enable, DISABLE)
+			if (!isMonitoringEnabled(this)
 				&& getPref(getManualUpdatePrefKey(), false)) {
 				// send message to MYSELF that the party is over
 				Intent i = new Intent(ac_aborting.toString(), Uri.EMPTY, this,
 					this.getClass());
 				WakefulIntentService.sendWakefulWork(this, i);
 				return;
-			} else if (!getPref(master_enable, DISABLE)) return;
+			} else if (!isMonitoringEnabled(this)) return;
 			else {
-				putPref(master_enable, DISABLE);
+				setMonitoringPref(this, DISABLE);
+				SettingsActivity.notifyMonitoringStateChange(this, ac_toggling,
+					true);
 				enableMonitoring(this, DISABLE);
 			}
 		}
@@ -283,13 +277,6 @@ public abstract class Monitor<K, Y extends Data> extends AlarmService {
 		if (in.getBooleanExtra(MANUAL_UPDATE_INTENT_KEY, false)) {
 			putPref(getManualUpdatePrefKey(), true);
 		}
-		runOnUiThread(new Runnable() {
-
-			@Override
-			public void run() {
-				MonitorActivity.onUpdating(Monitor.this);
-			}
-		});
 		return true;
 	}
 
@@ -297,31 +284,31 @@ public abstract class Monitor<K, Y extends Data> extends AlarmService {
 		synchronized (update_status_lock_) {
 			setUpdateInProgress(false);
 			clearManualUpdateFlag();
-			runOnUiThread(new Runnable() {
-
-				@Override
-				public void run() {
-					MonitorActivity.onDataUpdated(Monitor.this);
-				}
-			});
 		}
 	}
 
-	// helper
-	private void runOnUiThread(Runnable runnable) {
-		handler.post(runnable);
+	private static boolean isMonitoringEnabled(Context ctx) {
+		String master_enable = ctx.getResources()
+			.getText(R.string.enable_monitoring_master_pref_key).toString();
+		return AccessPreferences.get(ctx, master_enable, DISABLE);
+	}
+
+	private static void setMonitoringPref(Context ctx, boolean enable) {
+		String master_enable = ctx.getResources()
+			.getText(R.string.enable_monitoring_master_pref_key).toString();
+		AccessPreferences.put(ctx, master_enable, enable);
 	}
 
 	// reschedule alarms methods used by the subclasses //
 	final void updateInterval(Y t1, Y t2) {
-		d("Current : " + t1);
-		d("Previous : " + t2);
+		v("Current : " + t1);
+		v("Previous : " + t2);
 		if (t1.fairlyEqual(t2)) {
 			final int sameResultsCount = getSameResultsCount();
-			d("sameResultsCount : " + sameResultsCount);
+			v("sameResultsCount : " + sameResultsCount);
 			final long newInterval = MonitoringInterval.getUpdatedInterval(
 				sameResultsCount + 1, getCurrentInterval());
-			d("newInterval : " + newInterval);
+			v("newInterval : " + newInterval);
 			// enum decides if it is time to update the interval
 			if (newInterval == 0) { // no time to update yet
 				increaseCount();
@@ -331,7 +318,7 @@ public abstract class Monitor<K, Y extends Data> extends AlarmService {
 				rescheduleAlarms();
 			}
 		} else {
-			d("!!!!!!! Different Results");
+			v("!!!!!!! Different Results");
 			zeroCount();
 			if (getCurrentInterval() != getBaseInterval()) {
 				resetInterval();

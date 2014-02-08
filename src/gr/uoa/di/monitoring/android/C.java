@@ -71,6 +71,8 @@ public final class C {
 	public static final CharSequence ac_aborting = ACTION_PREFIX + "ABORTING";
 	public static final CharSequence ac_monitoring_aborted = ACTION_PREFIX
 		+ "MONITORING_ABORTED";
+	public static final CharSequence ac_toggling = ACTION_PREFIX
+		+ "USER_TOGGLES";
 	public static final boolean DISABLE = false;
 	public static final boolean ENABLE = true;
 	public static final boolean VERBOSE = false;
